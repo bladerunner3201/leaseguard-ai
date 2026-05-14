@@ -1,0 +1,28 @@
+.env
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Java / Gradle
+backend/.gradle/
+backend/build/
+backend/out/
+
+# Python
+rag-server/.venv/
+rag-server/__pycache__/
+rag-server/.pytest_cache/
+rag-server/**/*.pyc
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Runtime data
+uploads/
+chroma-data/
+mysql-data/

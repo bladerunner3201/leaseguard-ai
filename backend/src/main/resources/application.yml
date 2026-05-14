@@ -1,0 +1,21 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: leaseguard-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/leaseguard}
+    username: ${SPRING_DATASOURCE_USERNAME:leaseguard}
+    password: ${SPRING_DATASOURCE_PASSWORD:leaseguard123}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+rag:
+  server:
+    base-url: ${RAG_SERVER_BASE_URL:http://localhost:8000}
