@@ -1,0 +1,191 @@
+package com.leaseguard.contract.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leaseguard.anonymous.entity.AnonymousSession;
+import com.leaseguard.anonymous.repository.AnonymousSessionRepository;
+import com.leaseguard.contract.dto.ContractAnalysisResponse;
+import com.leaseguard.contract.dto.ContractResponse;
+import com.leaseguard.contract.dto.ContractUploadResponse;
+import com.leaseguard.contract.entity.Contract;
+import com.leaseguard.contract.entity.ContractAnalysisResult;
+import com.leaseguard.contract.repository.ContractAnalysisResultRepository;
+import com.leaseguard.contract.repository.ContractRepository;
+import com.leaseguard.global.exception.BadRequestException;
+import com.leaseguard.global.exception.ForbiddenException;
+import com.leaseguard.global.exception.NotFoundException;
+import com.leaseguard.rag.client.RagServerClient;
+import com.leaseguard.rag.dto.ContractAnalyzeRequest;
+import com.leaseguard.rag.dto.ContractAnalyzeResponse;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+@Service
+public class ContractService {
+
+    private final AnonymousSessionRepository anonymousSessionRepository;
+    private final ContractRepository contractRepository;
+    private final ContractAnalysisResultRepository analysisResultRepository;
+    private final RagServerClient ragServerClient;
+    private final ObjectMapper objectMapper;
+    private final Path uploadRoot;
+
+    public ContractService(
+            AnonymousSessionRepository anonymousSessionRepository,
+            ContractRepository contractRepository,
+            ContractAnalysisResultRepository analysisResultRepository,
+            RagServerClient ragServerClient,
+            ObjectMapper objectMapper,
+            @Value("${file.upload-root:uploads}") String uploadRoot
+    ) {
+        this.anonymousSessionRepository = anonymousSessionRepository;
+        this.contractRepository = contractRepository;
+        this.analysisResultRepository = analysisResultRepository;
+        this.ragServerClient = ragServerClient;
+        this.objectMapper = objectMapper;
+        this.uploadRoot = Path.of(uploadRoot).toAbsolutePath().normalize();
+    }
+
+    @Transactional
+    public ContractUploadResponse uploadContract(String anonymousSessionId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("업로드할 계약서 파일이 필요합니다.");
+        }
+
+        AnonymousSession anonymousSession = findAnonymousSession(anonymousSessionId);
+        Path storedFilePath = storeFile(anonymousSessionId, file);
+        String originalFilename = normalizeOriginalFilename(file);
+
+        Contract contract = contractRepository.save(new Contract(
+                anonymousSession,
+                originalFilename,
+                storedFilePath.toString(),
+                "UPLOADED",
+                LocalDateTime.now()
+        ));
+
+        ContractAnalyzeResponse ragResponse = ragServerClient.indexContract(new ContractAnalyzeRequest(
+                anonymousSessionId,
+                contract.getContractId(),
+                contract.getStoredFilePath(),
+                contract.getOriginalFileName()
+        ));
+
+        ContractAnalyzeResponse.Analysis analysis = ragResponse.analysis();
+        ContractAnalysisResult analysisResult = analysisResultRepository.save(new ContractAnalysisResult(
+                contract,
+                analysis.overallRiskLevel(),
+                analysis.summary(),
+                writeRiskItems(analysis.riskItems()),
+                LocalDateTime.now()
+        ));
+
+        contract.updateStatus(ragResponse.status());
+        return new ContractUploadResponse(
+                ContractResponse.from(contract),
+                ContractAnalysisResponse.of(analysisResult, analysis.riskItems())
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<ContractResponse> getContracts(String anonymousSessionId) {
+        ensureAnonymousSessionExists(anonymousSessionId);
+        return contractRepository.findByAnonymousSessionAnonymousSessionIdOrderByCreatedAtDesc(anonymousSessionId)
+                .stream()
+                .map(ContractResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ContractResponse getContract(String anonymousSessionId, Long contractId) {
+        return ContractResponse.from(findOwnedContract(anonymousSessionId, contractId));
+    }
+
+    @Transactional(readOnly = true)
+    public ContractAnalysisResponse getAnalysis(String anonymousSessionId, Long contractId) {
+        Contract contract = findOwnedContract(anonymousSessionId, contractId);
+        ContractAnalysisResult analysisResult = analysisResultRepository.findByContractContractId(contract.getContractId())
+                .orElseThrow(() -> new NotFoundException("계약서 분석 결과를 찾을 수 없습니다."));
+        return ContractAnalysisResponse.of(analysisResult, readRiskItems(analysisResult.getRiskItemsJson()));
+    }
+
+    @Transactional
+    public void deleteContract(String anonymousSessionId, Long contractId) {
+        Contract contract = findOwnedContract(anonymousSessionId, contractId);
+        contract.updateStatus("DELETED");
+    }
+
+    @Transactional(readOnly = true)
+    public Contract findOwnedContract(String anonymousSessionId, Long contractId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new NotFoundException("계약서를 찾을 수 없습니다."));
+        if (!contract.getAnonymousSession().getAnonymousSessionId().equals(anonymousSessionId)) {
+            throw new ForbiddenException("다른 익명 세션의 계약서에는 접근할 수 없습니다.");
+        }
+        return contract;
+    }
+
+    private AnonymousSession findAnonymousSession(String anonymousSessionId) {
+        return anonymousSessionRepository.findById(anonymousSessionId)
+                .orElseThrow(() -> new NotFoundException("익명 세션을 찾을 수 없습니다."));
+    }
+
+    private void ensureAnonymousSessionExists(String anonymousSessionId) {
+        if (!anonymousSessionRepository.existsById(anonymousSessionId)) {
+            throw new NotFoundException("익명 세션을 찾을 수 없습니다.");
+        }
+    }
+
+    private Path storeFile(String anonymousSessionId, MultipartFile file) {
+        String originalFilename = normalizeOriginalFilename(file);
+        String sanitizedFilename = originalFilename.replaceAll("[\\\\/:*?\"<>|]", "_");
+        Path directory = uploadRoot.resolve("contracts").resolve(anonymousSessionId).normalize();
+        Path storedFilePath = directory.resolve(UUID.randomUUID() + "_" + sanitizedFilename).normalize();
+
+        if (!storedFilePath.startsWith(uploadRoot)) {
+            throw new IllegalArgumentException("잘못된 파일 경로입니다.");
+        }
+
+        try {
+            Files.createDirectories(directory);
+            file.transferTo(storedFilePath);
+            return storedFilePath;
+        } catch (IOException exception) {
+            throw new IllegalStateException("계약서 파일 저장에 실패했습니다.", exception);
+        }
+    }
+
+    private String normalizeOriginalFilename(MultipartFile file) {
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return "contract";
+        }
+        return originalFilename;
+    }
+
+    private String writeRiskItems(List<ContractAnalyzeResponse.RiskItem> riskItems) {
+        try {
+            return objectMapper.writeValueAsString(riskItems == null ? List.of() : riskItems);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("위험 항목 직렬화에 실패했습니다.", exception);
+        }
+    }
+
+    private List<ContractAnalyzeResponse.RiskItem> readRiskItems(String riskItemsJson) {
+        try {
+            return objectMapper.readValue(riskItemsJson, new TypeReference<>() {
+            });
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("위험 항목 역직렬화에 실패했습니다.", exception);
+        }
+    }
+}

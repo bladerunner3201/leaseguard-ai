@@ -5,13 +5,15 @@ spring:
   application:
     name: leaseguard-backend
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/leaseguard}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/leaseguard?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${SPRING_DATASOURCE_USERNAME:leaseguard}
     password: ${SPRING_DATASOURCE_PASSWORD:leaseguard123}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
+    open-in-view: false
+    show-sql: true
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
