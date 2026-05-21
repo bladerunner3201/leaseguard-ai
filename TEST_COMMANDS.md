@@ -14,7 +14,78 @@
 
 ```powershell
 $BaseUrl = "http://localhost:8080"
+$RagBaseUrl = "http://localhost:8000"
 $ContractFile = "D:\leaseguard-ai\leaseguard-ai\data\sample_contracts\sample_lease_contract.txt"
+```
+
+## 0-1. FastAPI RAG Stub 서버 실행
+
+Spring Boot의 계약서 업로드와 채팅 메시지 API는 내부에서 FastAPI를 호출합니다. 실제 RAG 구현 전에는 stub 서버를 먼저 실행합니다.
+
+새 PowerShell 터미널에서 실행합니다.
+
+```powershell
+cd D:\leaseguard-ai\leaseguard-ai\rag-server
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+Python 실행 명령이 `python`이 아니라 `py`로 잡힌 환경이라면 다음처럼 실행합니다.
+
+```powershell
+cd D:\leaseguard-ai\leaseguard-ai\rag-server
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+health check:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "$RagBaseUrl/health" |
+  ConvertTo-Json -Depth 10
+```
+
+stub 계약서 인덱싱 endpoint 직접 테스트:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$RagBaseUrl/rag/contracts/index" `
+  -ContentType "application/json" `
+  -Body (@{
+    anonymousSessionId = "stub-session-id"
+    contractId = 1
+    filePath = "D:\leaseguard-ai\leaseguard-ai\data\sample_contracts\sample_lease_contract.txt"
+    originalFileName = "sample_lease_contract.txt"
+  } | ConvertTo-Json) |
+  ConvertTo-Json -Depth 20
+```
+
+stub 채팅 endpoint 직접 테스트:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$RagBaseUrl/rag/chat" `
+  -ContentType "application/json" `
+  -Body (@{
+    anonymousSessionId = "stub-session-id"
+    contractId = 1
+    message = "보증금 반환 조건이 위험한지 봐줘"
+    history = @(
+      @{
+        role = "user"
+        content = "계약서 분석해줘"
+      }
+    )
+  } | ConvertTo-Json -Depth 10) |
+  ConvertTo-Json -Depth 20
 ```
 
 ## 1. Anonymous Session 생성
