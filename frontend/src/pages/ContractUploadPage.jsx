@@ -1,27 +1,68 @@
-import { Upload } from 'lucide-react';
+import { ArrowLeft, Upload } from 'lucide-react';
+import { useState } from 'react';
 
+import { uploadContract } from '../api/client.js';
 import { useAnonymousSession } from '../hooks/useAnonymousSession.js';
 
-export default function ContractUploadPage({ navigate }) {
-  const { anonymousSessionId, loading } = useAnonymousSession();
+export default function ContractUploadPage({ navigate, onUploadSuccess }) {
+  const { anonymousSessionId, loading: sessionLoading, error: sessionError } = useAnonymousSession();
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!file) {
+      setError('Select a PDF or TXT file first.');
+      return;
+    }
+
+    setUploading(true);
+    setError('');
+    try {
+      const result = await uploadContract(file);
+      onUploadSuccess(result);
+    } catch (uploadError) {
+      setError(uploadError.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <section className="page">
       <header className="page-header">
-        <h1>계약서 업로드</h1>
-        <p>초기 MVP는 TXT 계약서부터 연결하고, 이후 PDF 추출을 확장합니다.</p>
+        <button className="text-button" type="button" onClick={() => navigate('home')}>
+          <ArrowLeft size={16} />
+          Back
+        </button>
+        <h1>Upload contract</h1>
+        <p>Use a TXT or PDF file. The current FastAPI server returns a fixed stub analysis.</p>
       </header>
-      <div className="panel">
+
+      <form className="panel stack" onSubmit={handleSubmit}>
+        <div className="status-line">
+          <span>Anonymous session:</span>
+          <code>{sessionLoading ? 'creating...' : anonymousSessionId}</code>
+        </div>
+        {sessionError && <p className="error-text">{sessionError}</p>}
+
         <label className="upload-box">
           <Upload size={28} />
-          <span>PDF 또는 TXT 파일 선택</span>
-          <input type="file" accept=".pdf,.txt" disabled={loading} />
+          <span>{file ? file.name : 'Choose PDF or TXT file'}</span>
+          <input
+            type="file"
+            accept=".pdf,.txt"
+            disabled={sessionLoading || uploading}
+            onChange={(event) => setFile(event.target.files?.[0] || null)}
+          />
         </label>
-        <p className="muted">세션: {anonymousSessionId || '생성 중'}</p>
-        <button className="secondary-button" type="button" onClick={() => navigate('analysis')}>
-          분석 결과 예시 보기
+
+        {error && <p className="error-text">{error}</p>}
+        <button className="primary-button" type="submit" disabled={sessionLoading || uploading}>
+          {uploading ? 'Uploading and analyzing...' : 'Upload and analyze'}
         </button>
-      </div>
+      </form>
     </section>
   );
 }

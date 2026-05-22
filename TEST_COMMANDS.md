@@ -2,6 +2,8 @@
 
 현재 Spring Boot Controller 구현 기준 PowerShell 테스트 명령어입니다.
 
+TODO: PowerShell 5에서 한글 메시지가 `?`로 저장되거나 표시되는 인코딩 문제가 있습니다. 현재 MVP 연동 검증 단계에서는 FastAPI stub 응답을 ASCII 영어로 유지하고, 실제 RAG/사용자 문구를 붙이는 단계에서 UTF-8 입출력 정책을 정리합니다.
+
 전제:
 
 - Backend: `http://localhost:8080`
@@ -17,6 +19,18 @@ $BaseUrl = "http://localhost:8080"
 $RagBaseUrl = "http://localhost:8000"
 $ContractFile = "D:\leaseguard-ai\leaseguard-ai\data\sample_contracts\sample_lease_contract.txt"
 ```
+
+## 0-0. React Frontend 실행
+
+새 PowerShell 터미널에서 실행합니다.
+
+```powershell
+cd D:\leaseguard-ai\leaseguard-ai\frontend
+npm install
+npm run dev
+```
+
+Vite dev server 기본 주소는 `http://localhost:5173`입니다. `frontend/vite.config.js`에서 `/api` 요청은 `http://localhost:8080`으로 proxy됩니다.
 
 ## 0-1. FastAPI RAG Stub 서버 실행
 
