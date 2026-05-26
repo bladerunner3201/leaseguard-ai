@@ -1,32 +1,21 @@
 from fastapi import APIRouter
 
-from app.schemas.chat_schema import RagChatRequest, RagChatResponse, RagSource
+from app.schemas.chat_schema import RagChatRequest, RagChatResponse
+from app.services.llm_service import generate_answer
+from app.services.retrieval_service import retrieve_sources
 
 router = APIRouter(prefix="/rag", tags=["chat"])
 
 
 @router.post("/chat", response_model=RagChatResponse)
 def chat(request: RagChatRequest) -> RagChatResponse:
+    sources = retrieve_sources(
+        message=request.message,
+        anonymous_session_id=request.anonymousSessionId,
+        contract_id=request.contractId,
+    )
+
     return RagChatResponse(
-        answer=(
-            "This is a fixed stub answer for Spring Boot integration testing. "
-            "The user message was received successfully. "
-            "No real RAG search, legal review, OpenAI call, or ChromaDB lookup is performed at this stage."
-        ),
-        sources=[
-            RagSource(
-                sourceType="contract",
-                sourceTitle="stub-contract-source",
-                pageNumber=1,
-                chunkText="Sample contract text: the deposit is returned after the lease ends.",
-                similarityScore=0.91,
-            ),
-            RagSource(
-                sourceType="checklist",
-                sourceTitle="stub-lease-checklist",
-                pageNumber=None,
-                chunkText="Sample checklist text: review deposit return terms and special clauses before signing.",
-                similarityScore=0.84,
-            ),
-        ],
+        answer=generate_answer(request.message, sources),
+        sources=sources,
     )

@@ -2,7 +2,7 @@
 
 현재 Spring Boot Controller 구현 기준 PowerShell 테스트 명령어입니다.
 
-TODO: PowerShell 5에서 한글 메시지가 `?`로 저장되거나 표시되는 인코딩 문제가 있습니다. 현재 MVP 연동 검증 단계에서는 FastAPI stub 응답을 ASCII 영어로 유지하고, 실제 RAG/사용자 문구를 붙이는 단계에서 UTF-8 입출력 정책을 정리합니다.
+TODO: PowerShell 5에서 한글 메시지가 `?`로 저장되거나 표시되는 인코딩 문제가 있습니다. 현재 ChromaDB 검색 파이프라인 검증 단계에서는 FastAPI template 응답을 ASCII 영어로 유지하고, 실제 RAG/사용자 문구를 붙이는 단계에서 UTF-8 입출력 정책을 정리합니다.
 
 전제:
 
@@ -32,9 +32,9 @@ npm run dev
 
 Vite dev server 기본 주소는 `http://localhost:5173`입니다. `frontend/vite.config.js`에서 `/api` 요청은 `http://localhost:8080`으로 proxy됩니다.
 
-## 0-1. FastAPI RAG Stub 서버 실행
+## 0-1. FastAPI RAG 서버 실행
 
-Spring Boot의 계약서 업로드와 채팅 메시지 API는 내부에서 FastAPI를 호출합니다. 실제 RAG 구현 전에는 stub 서버를 먼저 실행합니다.
+Spring Boot의 계약서 업로드와 채팅 메시지 API는 내부에서 FastAPI를 호출합니다. 현재 FastAPI는 OpenAI 없이 ChromaDB indexing/search만 수행합니다.
 
 새 PowerShell 터미널에서 실행합니다.
 
@@ -65,7 +65,16 @@ Invoke-RestMethod `
   ConvertTo-Json -Depth 10
 ```
 
-stub 계약서 인덱싱 endpoint 직접 테스트:
+reference 문서 인덱싱:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$RagBaseUrl/rag/references/index" |
+  ConvertTo-Json -Depth 10
+```
+
+계약서 인덱싱 endpoint 직접 테스트:
 
 ```powershell
 Invoke-RestMethod `
@@ -81,7 +90,7 @@ Invoke-RestMethod `
   ConvertTo-Json -Depth 20
 ```
 
-stub 채팅 endpoint 직접 테스트:
+채팅 검색 endpoint 직접 테스트:
 
 ```powershell
 Invoke-RestMethod `
@@ -100,6 +109,13 @@ Invoke-RestMethod `
     )
   } | ConvertTo-Json -Depth 10) |
   ConvertTo-Json -Depth 20
+```
+
+ChromaDB collection 상태 확인:
+
+```powershell
+cd D:\leaseguard-ai\leaseguard-ai\rag-server
+.\.venv\Scripts\python.exe -c "from app.vectorstore.chroma_client import get_chroma_client; c=get_chroma_client(); print([col.name for col in c.list_collections()]); print(c.get_collection('legal_reference').count()); print(c.get_collection('user_contracts').count())"
 ```
 
 ## 1. Anonymous Session 생성

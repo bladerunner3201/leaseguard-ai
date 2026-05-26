@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ChatHistoryMessage(BaseModel):
@@ -10,7 +10,7 @@ class RagChatRequest(BaseModel):
     anonymousSessionId: str
     contractId: int | None = None
     message: str
-    history: list[ChatHistoryMessage] = []
+    history: list[ChatHistoryMessage] = Field(default_factory=list)
 
 
 class RagSource(BaseModel):
