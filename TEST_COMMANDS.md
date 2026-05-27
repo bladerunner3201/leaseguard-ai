@@ -35,6 +35,7 @@ Vite dev server 기본 주소는 `http://localhost:5173`입니다. `frontend/vit
 ## 0-1. FastAPI RAG 서버 실행
 
 Spring Boot의 계약서 업로드와 채팅 메시지 API는 내부에서 FastAPI를 호출합니다. 현재 FastAPI는 OpenAI 없이 ChromaDB indexing/search만 수행합니다.
+RAG 검색 품질 확인용 직접 테스트 질문은 `TEST_RAG_SEARCH.md`를 참고합니다.
 
 새 PowerShell 터미널에서 실행합니다.
 

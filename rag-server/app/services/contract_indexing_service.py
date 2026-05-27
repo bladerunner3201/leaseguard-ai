@@ -1,5 +1,3 @@
-import hashlib
-
 from app.schemas.contract_schema import ContractIndexRequest, ContractIndexResponse
 from app.services.chunking_service import chunk_text
 from app.services.contract_parser import extract_text
@@ -16,11 +14,7 @@ def index_contract(request: ContractIndexRequest) -> ContractIndexResponse:
     metadatas: list[dict] = []
 
     for chunk_index, chunk in enumerate(chunks):
-        stable_key = (
-            f"contract:{request.anonymousSessionId}:{request.contractId}:"
-            f"{chunk_index}:{hashlib.sha1(chunk.encode('utf-8')).hexdigest()}"
-        )
-        ids.append(hashlib.sha1(stable_key.encode("utf-8")).hexdigest())
+        ids.append(f"contract:{request.anonymousSessionId}:{request.contractId}:{chunk_index}")
         metadatas.append(
             {
                 "sourceType": "contract",
@@ -31,8 +25,10 @@ def index_contract(request: ContractIndexRequest) -> ContractIndexResponse:
             }
         )
 
+    collection = get_user_contracts_collection()
+    _delete_existing_contract_chunks(collection, request.anonymousSessionId, request.contractId)
+
     if ids:
-        collection = get_user_contracts_collection()
         collection.upsert(
             ids=ids,
             documents=chunks,
@@ -45,3 +41,17 @@ def index_contract(request: ContractIndexRequest) -> ContractIndexResponse:
         status="INDEXED",
         analysis=analyze_contract(text),
     )
+
+
+def _delete_existing_contract_chunks(collection, anonymous_session_id: str, contract_id: int) -> None:
+    try:
+        collection.delete(
+            where={
+                "$and": [
+                    {"anonymousSessionId": anonymous_session_id},
+                    {"contractId": contract_id},
+                ]
+            }
+        )
+    except Exception:
+        pass

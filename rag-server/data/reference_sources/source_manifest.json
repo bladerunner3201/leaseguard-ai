@@ -1,0 +1,103 @@
+[
+  {
+    "title": "전입신고 및 확정일자 안내",
+    "sourceType": "guide",
+    "publisher": "생활법령정보",
+    "url": "원본 URL은 사용자가 수집한 자료 기준으로 프로젝트에서 보완",
+    "accessedAt": "2026-05-27",
+    "uploadedFile": "전입신고 및 확정일자 안내(1).txt",
+    "relatedFiles": [
+      "move_in_fixed_date_reference.txt",
+      "deposit_return_reference.txt"
+    ]
+  },
+  {
+    "title": "대항력 및 우선변제권",
+    "sourceType": "guide",
+    "publisher": "생활법령정보",
+    "url": "원본 URL은 사용자가 수집한 자료 기준으로 프로젝트에서 보완",
+    "accessedAt": "2026-05-27",
+    "uploadedFile": "대항력 및 우선변제권(1).txt",
+    "relatedFiles": [
+      "move_in_fixed_date_reference.txt",
+      "deposit_return_reference.txt",
+      "registry_check_reference.txt"
+    ]
+  },
+  {
+    "title": "민법 - 제3편 채권, 제2장 계약, 제7절 임대차",
+    "sourceType": "law",
+    "publisher": "국가법령정보센터 / 법무부",
+    "url": "원본 URL은 사용자가 수집한 자료 기준으로 프로젝트에서 보완",
+    "accessedAt": "2026-05-27",
+    "uploadedFile": "민법(법률)(제21454호)(20260317)(1).pdf",
+    "relatedFiles": [
+      "civil_lease_reference.txt",
+      "special_clause_repair_reference.txt"
+    ]
+  },
+  {
+    "title": "주택임대차보호법",
+    "sourceType": "law",
+    "publisher": "국가법령정보센터 / 법무부 / 국토교통부",
+    "url": "원본 URL은 사용자가 수집한 자료 기준으로 프로젝트에서 보완",
+    "accessedAt": "2026-05-27",
+    "uploadedFile": "주택임대차보호법(법률)(제21065호)(20260102)(1).pdf",
+    "relatedFiles": [
+      "housing_lease_protection_reference.txt",
+      "deposit_return_reference.txt",
+      "move_in_fixed_date_reference.txt"
+    ]
+  },
+  {
+    "title": "국토교통부 안심 전세계약 체크리스트 및 전세사기 피해예방 종합안내서 보도자료",
+    "sourceType": "checklist",
+    "publisher": "국토교통부",
+    "url": "원본 URL은 사용자가 수집한 자료 기준으로 프로젝트에서 보완",
+    "accessedAt": "2026-05-27",
+    "uploadedFile": "국토교통부 안심 전세계약 체크리스트](1).pdf",
+    "relatedFiles": [
+      "jeonse_fraud_prevention_reference.txt",
+      "registry_check_reference.txt",
+      "deposit_return_reference.txt"
+    ]
+  },
+  {
+    "title": "국토교통부 안심 전세계약 체크리스트",
+    "sourceType": "checklist",
+    "publisher": "국토교통부",
+    "url": "원본 URL은 사용자가 수집한 자료 기준으로 프로젝트에서 보완",
+    "accessedAt": "2026-05-27",
+    "uploadedFile": "(국토교통부)안심 전세계약 체크리스트(1).pdf",
+    "relatedFiles": [
+      "jeonse_fraud_prevention_reference.txt",
+      "registry_check_reference.txt",
+      "move_in_fixed_date_reference.txt"
+    ]
+  },
+  {
+    "title": "주택임대차표준계약서 및 양식",
+    "sourceType": "standard_contract",
+    "publisher": "법무부 / 국토교통부 등",
+    "url": "원본 URL은 사용자가 수집한 자료 기준으로 프로젝트에서 보완",
+    "accessedAt": "2026-05-27",
+    "uploadedFile": "주택임대차표준계약서 및 양식(1).hwp",
+    "relatedFiles": [
+      "standard_contract_reference.txt",
+      "special_clause_repair_reference.txt",
+      "deposit_return_reference.txt"
+    ]
+  },
+  {
+    "title": "안산시 주택임대차계약 체크리스트",
+    "sourceType": "checklist",
+    "publisher": "안산시",
+    "url": "https://www.ansan.go.kr/www/common/cntnts/selectContents.do?cntnts_id=www01801",
+    "accessedAt": "2026-05-27",
+    "uploadedFile": "안산시 주택임대차계약 체크리스트(1).pdf",
+    "relatedFiles": [
+      "registry_check_reference.txt",
+      "jeonse_fraud_prevention_reference.txt"
+    ]
+  }
+]

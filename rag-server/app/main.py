@@ -1,10 +1,13 @@
 from fastapi import FastAPI
+from dotenv import load_dotenv
 
 from app.api import chat_router, contract_router, reference_router
 
+load_dotenv()
+
 app = FastAPI(
     title="LeaseGuard AI RAG Server",
-    description="ChromaDB indexing and retrieval MVP. No OpenAI or LangChain calls are performed.",
+    description="ChromaDB retrieval MVP with optional OpenAI Chat API answer generation. LangChain is not used.",
 )
 
 app.include_router(reference_router.router)
