@@ -4,3 +4,4 @@ pydantic==2.10.4
 chromadb-client==0.5.23
 openai==1.58.1
 python-dotenv==1.0.1
+pypdf==5.1.0

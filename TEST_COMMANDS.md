@@ -20,6 +20,50 @@ $RagBaseUrl = "http://localhost:8000"
 $ContractFile = "D:\leaseguard-ai\leaseguard-ai\data\sample_contracts\sample_lease_contract.txt"
 ```
 
+## PDF Upload Test
+
+Text-based PDF files are supported through the same Spring Boot multipart upload API used by TXT files.
+Scanned PDFs are not supported in this MVP step because OCR is not implemented.
+
+Backend upload:
+
+```powershell
+$PdfContractFile = "D:\leaseguard-ai\leaseguard-ai\data\sample_contracts\sample_lease_contract.pdf"
+
+$pdfUploadResponse = Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BaseUrl/api/v1/contracts" `
+  -Headers $Headers `
+  -Form @{
+    file = Get-Item $PdfContractFile
+  }
+
+$pdfUploadResponse | ConvertTo-Json -Depth 20
+$pdfContractId = $pdfUploadResponse.data.contract.contractId
+```
+
+Direct FastAPI PDF indexing test:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$RagBaseUrl/rag/contracts/index" `
+  -ContentType "application/json" `
+  -Body (@{
+    anonymousSessionId = "pdf-test-session"
+    contractId = 9101
+    filePath = "D:\leaseguard-ai\leaseguard-ai\data\sample_contracts\sample_lease_contract.pdf"
+    originalFileName = "sample_lease_contract.pdf"
+  } | ConvertTo-Json) |
+  ConvertTo-Json -Depth 20
+```
+
+Expected:
+
+- Text-based PDF: returns the existing `contractId`, `status`, `analysis` response shape.
+- Scanned PDF or empty PDF: returns FastAPI 400 with `텍스트를 추출할 수 없는 PDF입니다. 스캔본은 OCR 기능이 필요합니다.`
+- `.png`, `.jpg`, `.jpeg`: unsupported in this MVP step; OCR/image extraction is not implemented.
+
 ## 0-0. React Frontend 실행
 
 새 PowerShell 터미널에서 실행합니다.

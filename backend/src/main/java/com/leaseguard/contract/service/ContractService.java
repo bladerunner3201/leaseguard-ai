@@ -23,10 +23,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -61,6 +63,7 @@ public class ContractService {
             throw new BadRequestException("업로드할 계약서 파일이 필요합니다.");
         }
 
+        validateSupportedFileExtension(file);
         AnonymousSession anonymousSession = findAnonymousSession(anonymousSessionId);
         Path storedFilePath = storeFile(anonymousSessionId, file);
         String originalFilename = normalizeOriginalFilename(file);
@@ -73,12 +76,20 @@ public class ContractService {
                 LocalDateTime.now()
         ));
 
-        ContractAnalyzeResponse ragResponse = ragServerClient.indexContract(new ContractAnalyzeRequest(
-                anonymousSessionId,
-                contract.getContractId(),
-                contract.getStoredFilePath(),
-                contract.getOriginalFileName()
-        ));
+        ContractAnalyzeResponse ragResponse;
+        try {
+            ragResponse = ragServerClient.indexContract(new ContractAnalyzeRequest(
+                    anonymousSessionId,
+                    contract.getContractId(),
+                    contract.getStoredFilePath(),
+                    contract.getOriginalFileName()
+            ));
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().is4xxClientError()) {
+                throw new BadRequestException(exception.getResponseBodyAsString());
+            }
+            throw exception;
+        }
 
         ContractAnalyzeResponse.Analysis analysis = ragResponse.analysis();
         ContractAnalysisResult analysisResult = analysisResultRepository.save(new ContractAnalysisResult(
@@ -170,6 +181,14 @@ public class ContractService {
             return "contract";
         }
         return originalFilename;
+    }
+
+    private void validateSupportedFileExtension(MultipartFile file) {
+        String originalFilename = normalizeOriginalFilename(file);
+        String lowerFilename = originalFilename.toLowerCase(Locale.ROOT);
+        if (!lowerFilename.endsWith(".txt") && !lowerFilename.endsWith(".pdf")) {
+            throw new BadRequestException("Only .txt and .pdf contract files are supported.");
+        }
     }
 
     private String writeRiskItems(List<ContractAnalyzeResponse.RiskItem> riskItems) {
