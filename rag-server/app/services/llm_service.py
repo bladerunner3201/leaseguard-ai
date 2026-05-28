@@ -2,7 +2,7 @@ import os
 
 from openai import OpenAI
 
-from app.schemas.chat_schema import RagSource
+from app.schemas.chat_schema import ChatHistoryMessage, RagSource
 
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
@@ -16,7 +16,8 @@ LeaseGuard AI는 부동산 임대차계약서를 처음 읽는 사용자를 위�
 사용자가 "이 계약 무효야?", "소송하면 이겨?", "무조건 위법이야?"처럼 법률 판단을 요구하면
 제공된 자료만으로는 단정할 수 없다고 말하고 변호사 또는 공인중개사 같은 전문가 상담을 권장하세요.
 
-반드시 제공된 계약서 조각과 reference source를 근거로만 답변하세요.
+최근 대화 맥락이 제공되면 사용자의 후속 질문이 무엇을 가리키는지 이해하는 데 활용하세요.
+다만 답변의 근거는 반드시 제공된 계약서 조각과 reference source에 두어야 합니다.
 sources에 없는 내용은 추측하지 말고 "제공된 자료만으로는 확인하기 어렵습니다"라고 답하세요.
 검색된 source의 내용을 바탕으로 위험 가능성과 확인사항을 친절하고 쉽게 설명하세요.
 
@@ -33,7 +34,11 @@ sources에 없는 내용은 추측하지 말고 "제공된 자료만으로는 �
 """.strip()
 
 
-def generate_answer(message: str, sources: list[RagSource]) -> str:
+def generate_answer(
+    message: str,
+    sources: list[RagSource],
+    chat_history: list[ChatHistoryMessage] | None = None,
+) -> str:
     if not sources:
         return _fallback_answer_without_sources()
 
@@ -45,13 +50,7 @@ def generate_answer(message: str, sources: list[RagSource]) -> str:
         client = OpenAI(api_key=api_key)
         completion = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL),
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": _build_user_prompt(message, sources),
-                },
-            ],
+            messages=_build_openai_messages(message, sources, chat_history or []),
             temperature=0.2,
         )
         answer = completion.choices[0].message.content
@@ -107,12 +106,40 @@ def _fallback_answer_without_sources() -> str:
     )
 
 
+def _build_openai_messages(
+    message: str,
+    sources: list[RagSource],
+    chat_history: list[ChatHistoryMessage],
+) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages.extend(_format_chat_history(chat_history))
+    messages.append(
+        {
+            "role": "user",
+            "content": _build_user_prompt(message, sources),
+        }
+    )
+    return messages
+
+
+def _format_chat_history(chat_history: list[ChatHistoryMessage]) -> list[dict[str, str]]:
+    formatted: list[dict[str, str]] = []
+    for history in chat_history[-10:]:
+        role = history.role if history.role in {"user", "assistant"} else "user"
+        content = (history.content or "").strip()
+        if not content:
+            continue
+        formatted.append({"role": role, "content": content[:2000]})
+    return formatted
+
+
 def _build_user_prompt(message: str, sources: list[RagSource]) -> str:
     return (
-        f"사용자 질문:\n{message}\n\n"
+        f"현재 사용자 질문:\n{message}\n\n"
         "검색된 sources:\n"
         f"{_format_sources_for_prompt(sources)}\n\n"
-        "위 sources를 근거로만 답변하세요. "
+        "최근 대화가 있다면 질문의 지시어를 이해하는 데만 활용하세요. "
+        "답변의 사실 근거는 위 sources로 제한하세요. "
         "sources에서 확인할 수 없는 내용은 반드시 '제공된 자료만으로는 확인하기 어렵습니다'라고 말하세요."
     )
 

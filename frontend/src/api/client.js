@@ -62,6 +62,18 @@ export async function uploadContract(file) {
   });
 }
 
+export async function getContracts() {
+  return apiFetch('/api/v1/contracts');
+}
+
+export async function getContract(contractId) {
+  return apiFetch(`/api/v1/contracts/${contractId}`);
+}
+
+export async function getContractAnalysis(contractId) {
+  return apiFetch(`/api/v1/contracts/${contractId}/analysis`);
+}
+
 export async function createChatSession({ contractId, title }) {
   return apiFetch('/api/v1/chat-sessions', {
     method: 'POST',
@@ -70,6 +82,10 @@ export async function createChatSession({ contractId, title }) {
     },
     body: JSON.stringify({ contractId, title }),
   });
+}
+
+export async function getChatSessions() {
+  return apiFetch('/api/v1/chat-sessions');
 }
 
 export async function sendChatMessage({ chatSessionId, contractId, message }) {

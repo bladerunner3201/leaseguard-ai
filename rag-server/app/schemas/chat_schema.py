@@ -10,6 +10,7 @@ class RagChatRequest(BaseModel):
     anonymousSessionId: str
     contractId: int | None = None
     message: str
+    chatHistory: list[ChatHistoryMessage] = Field(default_factory=list)
     history: list[ChatHistoryMessage] = Field(default_factory=list)
 
 

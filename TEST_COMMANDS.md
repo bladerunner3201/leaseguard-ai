@@ -105,6 +105,56 @@ Expected:
 - `description` explains why the item should be checked.
 - `evidence` contains 1-3 contract sentences or a short surrounding excerpt, capped around 300 characters.
 
+## Conversation Context Test
+
+Use this flow to verify that follow-up questions are sent to FastAPI with recent chat history.
+
+```powershell
+$Question1 = @{
+  contractId = $contractId
+  message = "이 계약에서 가장 우려되는 점은?"
+}
+
+$Answer1 = Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BaseUrl/api/v1/chat-sessions/$chatSessionId/messages" `
+  -Headers $Headers `
+  -ContentType "application/json" `
+  -Body ($Question1 | ConvertTo-Json)
+
+$Question2 = @{
+  contractId = $contractId
+  message = "그럼 내가 현실적으로 할 수 있는 일은?"
+}
+
+$Answer2 = Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BaseUrl/api/v1/chat-sessions/$chatSessionId/messages" `
+  -Headers $Headers `
+  -ContentType "application/json" `
+  -Body ($Question2 | ConvertTo-Json)
+
+$Question3 = @{
+  contractId = $contractId
+  message = "방금 말한 조항을 임대인에게 어떻게 물어봐야 해?"
+}
+
+$Answer3 = Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BaseUrl/api/v1/chat-sessions/$chatSessionId/messages" `
+  -Headers $Headers `
+  -ContentType "application/json" `
+  -Body ($Question3 | ConvertTo-Json)
+
+$Answer3 | ConvertTo-Json -Depth 20
+```
+
+Expected:
+
+- Spring Boot sends recent messages to FastAPI as `chatHistory`.
+- Follow-up questions such as `그럼`, `방금 말한 조항` are answered using recent conversation context.
+- The response shape remains `{ answer, sources }`.
+
 ## 0-0. React Frontend 실행
 
 새 PowerShell 터미널에서 실행합니다.

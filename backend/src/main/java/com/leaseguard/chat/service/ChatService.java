@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ChatService {
 
+    private static final int RAG_CHAT_HISTORY_LIMIT = 8;
+
     private final AnonymousSessionRepository anonymousSessionRepository;
     private final ContractService contractService;
     private final ChatSessionRepository chatSessionRepository;
@@ -120,7 +122,7 @@ public class ChatService {
                 anonymousSessionId,
                 contractId,
                 request.message(),
-                previousMessages.stream()
+                recentHistory(previousMessages).stream()
                         .map(message -> new RagChatRequest.HistoryMessage(message.getRole(), message.getContent()))
                         .toList()
         ));
@@ -142,6 +144,14 @@ public class ChatService {
             return requestContractId;
         }
         return chatSession.getContract() == null ? null : chatSession.getContract().getContractId();
+    }
+
+    private List<ChatMessage> recentHistory(List<ChatMessage> messages) {
+        List<ChatMessage> userAndAssistantMessages = messages.stream()
+                .filter(message -> "user".equals(message.getRole()) || "assistant".equals(message.getRole()))
+                .toList();
+        int fromIndex = Math.max(0, userAndAssistantMessages.size() - RAG_CHAT_HISTORY_LIMIT);
+        return userAndAssistantMessages.subList(fromIndex, userAndAssistantMessages.size());
     }
 
     private List<MessageSourceResponse> saveSources(ChatMessage assistantMessage, List<RagChatResponse.Source> sources) {

@@ -27,6 +27,16 @@ input:disabled {
   min-height: 100vh;
 }
 
+.global-error {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0;
+  background: #fff4f2;
+  border-bottom: 1px solid #ffd7d2;
+  padding: 10px 24px;
+}
+
 .page {
   width: min(960px, 100%);
   min-height: 100vh;
@@ -163,6 +173,30 @@ h3 {
   justify-content: space-between;
 }
 
+.action-row.left {
+  justify-content: flex-start;
+}
+
+.card-title {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-title h2 {
+  overflow-wrap: anywhere;
+}
+
+.contract-list {
+  display: grid;
+  gap: 14px;
+}
+
+.contract-card {
+  gap: 16px;
+}
+
 code {
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -187,6 +221,10 @@ code {
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.detail-grid.compact {
+  grid-template-columns: 90px 1fr;
 }
 
 .risk-badge {
@@ -245,6 +283,11 @@ blockquote {
   border-radius: 8px;
 }
 
+.message-content {
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 .assistant-message {
   justify-self: start;
   background: #eef5f5;
@@ -273,6 +316,7 @@ blockquote {
 .source-item p {
   color: #586173;
   line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .chat-form {

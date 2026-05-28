@@ -1,15 +1,50 @@
-import { ArrowLeft, Send } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, FolderOpen, Send } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-import { createChatSession, sendChatMessage } from '../api/client.js';
+import { createChatSession, getChatMessages, sendChatMessage } from '../api/client.js';
 
 export default function ChatPage({ navigate, contractResult, chatSession, setChatSession }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState('');
 
   const contractId = contractResult?.contract?.contractId;
+  const chatSessionId = chatSession?.chatSessionId;
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadMessages() {
+      if (!chatSessionId) {
+        setMessages([]);
+        return;
+      }
+
+      setLoadingMessages(true);
+      setError('');
+      try {
+        const savedMessages = await getChatMessages(chatSessionId);
+        if (!ignore) {
+          setMessages(savedMessages || []);
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError.message);
+        }
+      } finally {
+        if (!ignore) {
+          setLoadingMessages(false);
+        }
+      }
+    }
+
+    loadMessages();
+    return () => {
+      ignore = true;
+    };
+  }, [chatSessionId]);
 
   const ensureChatSession = async () => {
     if (chatSession) {
@@ -62,11 +97,17 @@ export default function ChatPage({ navigate, contractResult, chatSession, setCha
       <section className="page">
         <header className="page-header">
           <h1>No contract selected</h1>
-          <p>Upload a contract before opening chat.</p>
+          <p>Upload a contract or choose one from your saved contract list before opening chat.</p>
         </header>
-        <button className="primary-button" type="button" onClick={() => navigate('upload')}>
-          Go to upload
-        </button>
+        <div className="action-row left">
+          <button className="primary-button" type="button" onClick={() => navigate('upload')}>
+            Go to upload
+          </button>
+          <button className="secondary-button" type="button" onClick={() => navigate('dashboard')}>
+            <FolderOpen size={18} />
+            My contracts
+          </button>
+        </div>
       </section>
     );
   }
@@ -79,20 +120,21 @@ export default function ChatPage({ navigate, contractResult, chatSession, setCha
           Back to analysis
         </button>
         <h1>Contract Q&A</h1>
-        <p>Messages are sent through Spring Boot to the FastAPI stub server.</p>
+        <p>업로드한 계약서와 임대차 reference 문서를 바탕으로 답변합니다.</p>
       </header>
 
       <div className="chat-window">
-        {messages.length === 0 && (
+        {loadingMessages && <div className="assistant-message">Loading saved messages...</div>}
+        {!loadingMessages && messages.length === 0 && (
           <div className="assistant-message">
-            Ask a question about the uploaded contract. The current answer is a fixed FastAPI stub response.
+            업로드한 계약서에 대해 궁금한 점을 질문하세요. 답변에는 계약서와 reference source가 함께 표시됩니다.
           </div>
         )}
 
         {messages.map((message, index) => (
-          <article className={`${message.role}-message`} key={`${message.role}-${index}`}>
+          <article className={`${message.role}-message`} key={message.messageId || `${message.role}-${index}`}>
             <strong>{message.role}</strong>
-            <p>{message.content}</p>
+            <p className="message-content">{message.content}</p>
             {message.sources?.length > 0 && (
               <div className="sources">
                 <h3>Sources</h3>

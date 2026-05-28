@@ -37,7 +37,7 @@ export default function ContractUploadPage({ navigate, onUploadSuccess }) {
           Back
         </button>
         <h1>Upload contract</h1>
-        <p>Use a TXT or PDF file. The current FastAPI server returns a fixed stub analysis.</p>
+        <p>Use a TXT or text-based PDF file. The analysis uses extracted contract text and RAG sources.</p>
       </header>
 
       <form className="panel stack" onSubmit={handleSubmit}>

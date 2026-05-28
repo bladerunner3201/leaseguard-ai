@@ -1,21 +1,27 @@
-import { MessageCircle, Upload } from 'lucide-react';
+import { FolderOpen, MessageCircle, Upload } from 'lucide-react';
 
 function RiskBadge({ level }) {
   return <span className={`risk-badge ${String(level || '').toLowerCase()}`}>{level || 'UNKNOWN'}</span>;
 }
 
-export default function AnalysisPage({ navigate, contractResult }) {
+export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
   if (!contractResult) {
     return (
       <section className="page">
         <header className="page-header">
           <h1>No analysis yet</h1>
-          <p>Upload a contract first to view the stub analysis response.</p>
+          <p>Upload a contract or choose one from your saved contract list.</p>
         </header>
-        <button className="primary-button" type="button" onClick={() => navigate('upload')}>
-          <Upload size={18} />
-          Go to upload
-        </button>
+        <div className="action-row left">
+          <button className="primary-button" type="button" onClick={() => navigate('upload')}>
+            <Upload size={18} />
+            Go to upload
+          </button>
+          <button className="secondary-button" type="button" onClick={() => navigate('dashboard')}>
+            <FolderOpen size={18} />
+            My contracts
+          </button>
+        </div>
       </section>
     );
   }
@@ -26,7 +32,7 @@ export default function AnalysisPage({ navigate, contractResult }) {
     <section className="page stack">
       <header className="page-header">
         <h1>Analysis result</h1>
-        <p>Contract upload and FastAPI stub analysis completed.</p>
+        <p>확인 필요 항목과 계약서에서 발췌한 근거 문장을 함께 보여줍니다.</p>
       </header>
 
       <section className="panel stack">
@@ -69,7 +75,11 @@ export default function AnalysisPage({ navigate, contractResult }) {
           <Upload size={18} />
           Upload another
         </button>
-        <button className="primary-button" type="button" onClick={() => navigate('chat')}>
+        <button className="secondary-button" type="button" onClick={() => navigate('dashboard')}>
+          <FolderOpen size={18} />
+          My contracts
+        </button>
+        <button className="primary-button" type="button" onClick={onOpenChat}>
           <MessageCircle size={18} />
           Ask about this contract
         </button>

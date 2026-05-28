@@ -6,7 +6,7 @@ public record RagChatRequest(
         String anonymousSessionId,
         Long contractId,
         String message,
-        List<HistoryMessage> history
+        List<HistoryMessage> chatHistory
 ) {
     public record HistoryMessage(String role, String content) {
     }
