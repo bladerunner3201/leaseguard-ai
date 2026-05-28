@@ -10,12 +10,12 @@ CATEGORY_EXPANSIONS = [
     },
     {
         "category": "special_clause_repair",
-        "triggers": ["특약", "불리", "수리", "원상복구", "원상회복", "special", "clause", "repair", "restoration"],
+        "triggers": ["특약", "불리", "수리", "수리비", "원상복구", "원상회복", "special", "clause", "repair", "restoration"],
         "expansion": "special_clause_repair special clause unfair term repair cost restoration tenant burden",
     },
     {
         "category": "move_in_fixed_date",
-        "triggers": ["전입", "확정일자", "대항력", "우선변제", "move in", "fixed date", "priority repayment"],
+        "triggers": ["전입", "전입신고", "확정일자", "대항력", "우선변제권", "move in", "fixed date", "priority repayment"],
         "expansion": "move_in_fixed_date resident registration fixed date opposing power priority repayment",
     },
     {
@@ -45,9 +45,16 @@ NORMALIZED_SOURCE_TYPES = {
 }
 
 
-def retrieve_sources(message: str, anonymous_session_id: str, contract_id: int | None) -> list[RagSource]:
-    expected_categories = _infer_expected_categories(message)
-    expanded_query = _expand_query(message, expected_categories)
+def retrieve_sources(
+    message: str,
+    anonymous_session_id: str,
+    contract_id: int | None,
+    rewritten_query: str | None = None,
+) -> list[RagSource]:
+    query_text = rewritten_query or message
+    category_signal = f"{message} {query_text}"
+    expected_categories = _infer_expected_categories(category_signal)
+    expanded_query = _expand_query(query_text, expected_categories)
     query_embedding = embed_text(expanded_query)
     sources: list[RagSource] = []
 

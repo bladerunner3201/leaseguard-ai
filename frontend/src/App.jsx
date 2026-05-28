@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 
 import {
+  CHAT_SESSION_STORAGE_KEY,
+  clearAnonymousSession,
   createChatSession,
   getChatSessions,
   getContractAnalysis,
@@ -10,8 +12,6 @@ import ChatPage from './pages/ChatPage.jsx';
 import ContractUploadPage from './pages/ContractUploadPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import HomePage from './pages/HomePage.jsx';
-
-const CHAT_SESSION_STORAGE_KEY = 'leaseguardChatSessionsByContract';
 
 function loadStoredChatSessions() {
   try {
@@ -105,6 +105,14 @@ export default function App() {
     storeChatSession(contractId, nextChatSession);
   };
 
+  const resetAnonymousSession = () => {
+    clearAnonymousSession();
+    setContractResult(null);
+    setChatSession(null);
+    setNavigationError('');
+    setPage('upload');
+  };
+
   return (
     <main className="app-shell">
       {navigationError && <p className="global-error error-text">{navigationError}</p>}
@@ -114,6 +122,7 @@ export default function App() {
           navigate={navigate}
           onOpenAnalysis={openAnalysis}
           onOpenChat={openChat}
+          onResetSession={resetAnonymousSession}
         />
       )}
       {page === 'upload' && (

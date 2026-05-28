@@ -7,7 +7,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ContractRepository extends JpaRepository<Contract, Long> {
 
-    List<Contract> findByAnonymousSessionAnonymousSessionIdOrderByCreatedAtDesc(String anonymousSessionId);
+    List<Contract> findByAnonymousSessionAnonymousSessionIdAndStatusNotOrderByCreatedAtDesc(
+            String anonymousSessionId,
+            String status
+    );
 
     Optional<Contract> findByContractIdAndAnonymousSessionAnonymousSessionId(
             Long contractId,

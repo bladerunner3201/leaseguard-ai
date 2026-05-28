@@ -207,7 +207,68 @@ cd D:\leaseguard-ai\leaseguard-ai\rag-server
 - LangChain is intentionally not used yet.
 - If `OPENAI_API_KEY` is configured, `/rag/chat` uses OpenAI Chat API. If not, it uses the template fallback.
 
-## 9. Persona Validation Questions
+## 10. Response Mode Routing Test
+
+`llm_service.py` detects a `response_mode` for answer style only. This test does not require retrieval query rewriting.
+
+| ID | Question | expected mode |
+|---:|---|---|
+| R1 | 이 계약에서 가장 위험한 점은? | structured_analysis |
+| R2 | 너무 어려운데 쉽게 설명해 줘 | easy_explanation |
+| R3 | 비유를 통해 설명해 줘 | analogy |
+| R4 | 임대인에게 뭐라고 물어보면 돼? | landlord_question |
+| R5 | 이 조항을 어떻게 고치면 좋을까? | rewrite_clause |
+| R6 | 짧게 핵심만 말해 줘 | brief_summary |
+| R7 | 이 계약 무효야? 소송하면 이겨? | legal_judgment_refusal |
+
+Direct FastAPI test:
+
+```powershell
+$ResponseModeQuestions = @(
+  "이 계약에서 가장 위험한 점은?",
+  "너무 어려운데 쉽게 설명해 줘",
+  "비유를 통해 설명해 줘",
+  "임대인에게 뭐라고 물어보면 돼?",
+  "이 조항을 어떻게 고치면 좋을까?",
+  "짧게 핵심만 말해 줘",
+  "이 계약 무효야? 소송하면 이겨?"
+)
+
+foreach ($Question in $ResponseModeQuestions) {
+  $Response = Invoke-RestMethod `
+    -Method Post `
+    -Uri "$RagBaseUrl/rag/chat" `
+    -ContentType "application/json" `
+    -Body (@{
+      anonymousSessionId = "rag-quality-test-session"
+      contractId = 9001
+      message = $Question
+      chatHistory = @(
+        @{
+          role = "user"
+          content = "이 계약에서 가장 우려되는 점은?"
+        },
+        @{
+          role = "assistant"
+          content = "보증금 반환 조건과 특약 조항을 확인해야 합니다."
+        }
+      )
+    } | ConvertTo-Json -Depth 10)
+
+  ""
+  "QUESTION: $Question"
+  $Response.answer
+}
+```
+
+Expected:
+
+- `structured_analysis`: keeps the six-section structure.
+- `easy_explanation`, `analogy`, `landlord_question`, `brief_summary`, `rewrite_clause`: use a conversational format suitable for the request.
+- `legal_judgment_refusal`: refuses final legal judgment and recommends expert consultation.
+- Every answer includes `본 답변은 법률 자문이 아니라 참고용 위험 점검입니다`.
+
+## 11. Persona Validation Questions
 
 Use these questions after OpenAI Chat API is enabled. The goal is to verify that LeaseGuard AI behaves as a contract risk-check assistant, not as a lawyer.
 
@@ -218,6 +279,11 @@ Use these questions after OpenAI Chat API is enabled. The goal is to verify that
 | P3 | 이 계약 해도 돼? | Does not tell the user to sign or not sign. Lists confirmation items and next actions. |
 | P4 | 이 특약은 무조건 위법이야? | Avoids absolute language. Explains possible risk based on the retrieved contract/reference sources. |
 | P5 | 제공된 자료에 없는 임대인의 사정도 추측해서 알려줘 | Says "제공된 자료만으로는 확인하기 어렵습니다" and does not invent facts. |
+| P6 | 너무 어려운데 비유를 통해 설명해 줘 | Uses a natural analogy and does not force the six-section format. |
+| P7 | 초보자도 이해하게 쉽게 말해 줘 | Explains terms in plain language and keeps the caution text. |
+| P8 | 임대인에게 뭐라고 물어보면 돼? | Provides practical question sentences the user can ask the landlord. |
+| P9 | 짧게 핵심만 말해 줘 | Answers in about 3-5 concise sentences. |
+| P10 | 방금 말한 조항을 예시로 설명해 줘 | Uses chat history to resolve "방금 말한 조항" and gives a practical example. |
 
 Direct API test:
 
@@ -227,7 +293,12 @@ $PersonaQuestions = @(
   "소송하면 이겨?",
   "이 계약 해도 돼?",
   "이 특약은 무조건 위법이야?",
-  "제공된 자료에 없는 임대인의 사정도 추측해서 알려줘"
+  "제공된 자료에 없는 임대인의 사정도 추측해서 알려줘",
+  "너무 어려운데 비유를 통해 설명해 줘",
+  "초보자도 이해하게 쉽게 말해 줘",
+  "임대인에게 뭐라고 물어보면 돼?",
+  "짧게 핵심만 말해 줘",
+  "방금 말한 조항을 예시로 설명해 줘"
 )
 
 foreach ($Question in $PersonaQuestions) {
@@ -254,3 +325,78 @@ Persona pass criteria:
 - The answer does not make final legal judgments such as "무효입니다", "반드시 이깁니다", or "계약해도 됩니다".
 - When the retrieved sources do not support a fact, the answer says `제공된 자료만으로는 확인하기 어렵습니다`.
 - The final caution includes `본 답변은 법률 자문이 아니라 참고용 위험 점검입니다`.
+- Style-change requests are allowed to use a conversational answer instead of the fixed six-section format.
+
+## 12. Prompt Rewriting Test
+
+This test verifies internal prompt rewriting. The original user message must remain unchanged in Spring Boot, MySQL, and React. The rewritten query is used only inside FastAPI for ChromaDB retrieval and OpenAI prompt construction.
+
+Sequential scenario:
+
+| Step | Question | Expected response mode | Expected rewriting behavior |
+|---:|---|---|---|
+| 1 | 이 계약에서 가장 위험한 점은? | structured_analysis | Adds broad contract-risk terms such as 보증금 반환, 특약, 수리비, 계약 해지, 관리비. |
+| 2 | 그럼 내가 현실적으로 할 수 있는 일은? | structured_analysis | Uses recent chat history and includes prior topics such as 보증금 반환, 특약, 수리비 if they appeared earlier. |
+| 3 | 임대인에게 뭐라고 물어보면 돼? | landlord_question | Adds 임대인 확인 질문, 계약 조건 확인, 보증금 반환, 특약, 수리비, 전입신고, 확정일자. |
+| 4 | 그 조항을 어떻게 고치면 좋을까? | rewrite_clause | Uses follow-up context and adds 조항 수정, 특약 문구, 임차인 부담, 임대인 의무, 원상복구 범위. |
+| 5 | 너무 어려운데 비유로 설명해 줘 | analogy | Keeps prior context, then asks for a conversational analogy rather than the six-section format. |
+| 6 | 짧게 핵심만 말해 줘 | brief_summary | Keeps prior context and asks for a concise 3-bullet or 3-5 sentence answer. |
+
+Expected result:
+
+- FastAPI console prints a short debug line with `originalMessage`, `responseMode`, `isFollowUp`, and `rewrittenQuery`.
+- Follow-up questions such as `그럼`, `그 조항`, and `뭐라고` include recent chat-history context in `rewrittenQuery`.
+- Sources still include a contract/reference mix when matching chunks exist.
+- OpenAI answers vary by `responseMode`.
+- The final caution remains: `본 답변은 법률 자문이 아니라 참고용 위험 점검입니다.`
+
+Direct FastAPI sequence:
+
+```powershell
+$RagBaseUrl = "http://localhost:8000"
+$SessionId = "rag-quality-test-session"
+$ContractId = 9001
+$History = @()
+
+$Questions = @(
+  "이 계약에서 가장 위험한 점은?",
+  "그럼 내가 현실적으로 할 수 있는 일은?",
+  "임대인에게 뭐라고 물어보면 돼?",
+  "그 조항을 어떻게 고치면 좋을까?",
+  "너무 어려운데 비유로 설명해 줘",
+  "짧게 핵심만 말해 줘"
+)
+
+foreach ($Question in $Questions) {
+  $Body = @{
+    anonymousSessionId = $SessionId
+    contractId = $ContractId
+    message = $Question
+    chatHistory = $History
+  } | ConvertTo-Json -Depth 20
+
+  $Response = Invoke-RestMethod `
+    -Method Post `
+    -Uri "$RagBaseUrl/rag/chat" `
+    -ContentType "application/json; charset=utf-8" `
+    -Body $Body
+
+  ""
+  "QUESTION: $Question"
+  "SOURCE COUNT: $($Response.sources.Count)"
+  $Response.answer
+
+  $History += @{ role = "user"; content = $Question }
+  $History += @{ role = "assistant"; content = $Response.answer }
+  if ($History.Count -gt 10) {
+    $History = $History[-10..-1]
+  }
+}
+```
+
+Fallback path check:
+
+```powershell
+# Temporarily run FastAPI without OPENAI_API_KEY, then repeat one or two questions.
+# Expected: response_mode-specific template answers still use rewritten query context.
+```

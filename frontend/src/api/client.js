@@ -1,4 +1,5 @@
 const SESSION_STORAGE_KEY = 'anonymousSessionId';
+export const CHAT_SESSION_STORAGE_KEY = 'leaseguardChatSessionsByContract';
 
 export function getAnonymousSessionId() {
   return localStorage.getItem(SESSION_STORAGE_KEY);
@@ -9,6 +10,11 @@ export function setAnonymousSessionId(anonymousSessionId) {
     return;
   }
   localStorage.setItem(SESSION_STORAGE_KEY, anonymousSessionId);
+}
+
+export function clearAnonymousSession() {
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+  localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
 }
 
 async function parseResponse(response) {
@@ -72,6 +78,12 @@ export async function getContract(contractId) {
 
 export async function getContractAnalysis(contractId) {
   return apiFetch(`/api/v1/contracts/${contractId}/analysis`);
+}
+
+export async function deleteContract(contractId) {
+  return apiFetch(`/api/v1/contracts/${contractId}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function createChatSession({ contractId, title }) {

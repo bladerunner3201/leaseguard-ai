@@ -110,7 +110,10 @@ public class ContractService {
     @Transactional(readOnly = true)
     public List<ContractResponse> getContracts(String anonymousSessionId) {
         ensureAnonymousSessionExists(anonymousSessionId);
-        return contractRepository.findByAnonymousSessionAnonymousSessionIdOrderByCreatedAtDesc(anonymousSessionId)
+        return contractRepository.findByAnonymousSessionAnonymousSessionIdAndStatusNotOrderByCreatedAtDesc(
+                        anonymousSessionId,
+                        "DELETED"
+                )
                 .stream()
                 .map(ContractResponse::from)
                 .toList();
@@ -141,6 +144,9 @@ public class ContractService {
                 .orElseThrow(() -> new NotFoundException("계약서를 찾을 수 없습니다."));
         if (!contract.getAnonymousSession().getAnonymousSessionId().equals(anonymousSessionId)) {
             throw new ForbiddenException("다른 익명 세션의 계약서에는 접근할 수 없습니다.");
+        }
+        if ("DELETED".equals(contract.getStatus())) {
+            throw new NotFoundException("삭제된 계약서입니다.");
         }
         return contract;
     }
