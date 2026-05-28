@@ -16,8 +16,8 @@ RULES = [
             "refund",
             "security deposit",
             "bojeung",
-            "蹂댁쬆湲",
-            "諛섑솚",
+            "보증금",
+            "반환",
         ],
         "title": "보증금 반환 조건 확인 필요",
         "description": (
@@ -34,7 +34,7 @@ RULES = [
             "special",
             "clause",
             "addendum",
-            "?뱀빟",
+            "특약",
         ],
         "title": "특약 조항 책임 범위 확인 필요",
         "description": (
@@ -54,8 +54,8 @@ RULES = [
             "maintenance",
             "damage",
             "fix",
-            "?섎━",
-            "蹂댁닔",
+            "수리",
+            "보수",
         ],
         "title": "수리비 부담 범위 확인 필요",
         "description": (
@@ -74,8 +74,8 @@ RULES = [
             "cancel",
             "end of lease",
             "terminate",
-            "?댁?",
-            "醫낅즺",
+            "해지",
+            "종료",
         ],
         "title": "계약 해지 조건 확인 필요",
         "description": (
@@ -92,7 +92,7 @@ RULES = [
             "maintenance fee",
             "management fee",
             "fee",
-            "愿由щ퉬",
+            "관리비",
         ],
         "title": "관리비 항목 확인 필요",
         "description": (
