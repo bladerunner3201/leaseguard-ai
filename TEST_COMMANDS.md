@@ -64,6 +64,47 @@ Expected:
 - Scanned PDF or empty PDF: returns FastAPI 400 with `텍스트를 추출할 수 없는 PDF입니다. 스캔본은 OCR 기능이 필요합니다.`
 - `.png`, `.jpg`, `.jpeg`: unsupported in this MVP step; OCR/image extraction is not implemented.
 
+## Analysis Evidence Test
+
+After TXT or PDF upload, verify that each `riskItems` entry includes contract text evidence instead of a developer-facing keyword message.
+
+Spring Boot analysis response:
+
+```powershell
+$analysisResponse = Invoke-RestMethod `
+  -Method Get `
+  -Uri "$BaseUrl/api/v1/contracts/$contractId/analysis" `
+  -Headers $Headers
+
+$analysisResponse.data.riskItems |
+  Select-Object category, riskLevel, title, description, evidence |
+  Format-List
+```
+
+Direct FastAPI analysis test:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$RagBaseUrl/rag/contracts/index" `
+  -ContentType "application/json" `
+  -Body (@{
+    anonymousSessionId = "analysis-evidence-test"
+    contractId = 9201
+    filePath = "D:\leaseguard-ai\leaseguard-ai\data\sample_contracts\sample_lease_contract.txt"
+    originalFileName = "sample_lease_contract.txt"
+  } | ConvertTo-Json) |
+  Select-Object -ExpandProperty analysis |
+  ConvertTo-Json -Depth 20
+```
+
+Expected:
+
+- `summary` is written for users, not as a ChromaDB/debug message.
+- `title` uses Korean user-facing wording such as `보증금 반환 조건 확인 필요`.
+- `description` explains why the item should be checked.
+- `evidence` contains 1-3 contract sentences or a short surrounding excerpt, capped around 300 characters.
+
 ## 0-0. React Frontend 실행
 
 새 PowerShell 터미널에서 실행합니다.

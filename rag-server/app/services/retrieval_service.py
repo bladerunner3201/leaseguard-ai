@@ -35,6 +35,15 @@ CATEGORY_EXPANSIONS = [
     },
 ]
 
+NORMALIZED_SOURCE_TYPES = {
+    "contract",
+    "law",
+    "checklist",
+    "guide",
+    "legal_reference",
+    "standard_contract",
+}
+
 
 def retrieve_sources(message: str, anonymous_session_id: str, contract_id: int | None) -> list[RagSource]:
     expected_categories = _infer_expected_categories(message)
@@ -135,7 +144,7 @@ def _query_collection(
         metadata = row["metadata"]
         sources.append(
             RagSource(
-                sourceType=metadata.get("sourceType", source_type_fallback),
+                sourceType=_normalize_source_type(metadata.get("sourceType"), source_type_fallback),
                 sourceTitle=metadata.get("documentName") or metadata.get("title") or metadata.get("fileName") or "unknown",
                 pageNumber=None,
                 chunkText=row["document"],
@@ -143,6 +152,18 @@ def _query_collection(
             )
         )
     return sources
+
+
+def _normalize_source_type(value: str | None, fallback: str) -> str:
+    normalized = (value or fallback or "legal_reference").strip().lower().replace(" ", "_")
+    if normalized == "curated":
+        return "legal_reference"
+    if normalized in NORMALIZED_SOURCE_TYPES:
+        return normalized
+    for candidate in ["standard_contract", "checklist", "guide", "law", "legal_reference", "contract"]:
+        if candidate in normalized:
+            return candidate
+    return fallback if fallback in NORMALIZED_SOURCE_TYPES else "legal_reference"
 
 
 def _distance_to_similarity(distance: float | None) -> float | None:

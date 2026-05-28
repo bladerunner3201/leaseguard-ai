@@ -6,6 +6,15 @@ from app.services.chunking_service import chunk_text
 from app.services.embedding_service import embed_texts
 from app.vectorstore.chroma_client import get_legal_reference_collection
 
+NORMALIZED_SOURCE_TYPES = {
+    "contract",
+    "law",
+    "checklist",
+    "guide",
+    "legal_reference",
+    "standard_contract",
+}
+
 
 def index_references() -> dict:
     repo_data_root = Path(__file__).resolve().parents[3] / "data"
@@ -76,7 +85,10 @@ def _build_metadata_base(path: Path, default_source_type: str, parsed: dict, man
 
     return {
         "category": parsed.get("category") or _category_from_file_name(path.name),
-        "sourceType": parsed.get("source_type") or _manifest_source_type(manifest_items) or default_source_type,
+        "sourceType": _normalize_source_type(
+            parsed.get("source_type") or _manifest_source_type(manifest_items) or default_source_type,
+            default_source_type,
+        ),
         "title": parsed.get("title") or _manifest_title(manifest_items) or path.stem.replace("_", " "),
         "fileName": path.name,
         "keywords": parsed.get("keywords") or "",
@@ -136,6 +148,18 @@ def _load_manifest_by_related_file(path: Path) -> dict[str, list[dict]]:
 def _manifest_source_type(items: list[dict]) -> str:
     source_types = [item.get("sourceType", "") for item in items if item.get("sourceType")]
     return " + ".join(dict.fromkeys(source_types))
+
+
+def _normalize_source_type(value: str, fallback: str = "legal_reference") -> str:
+    normalized = (value or fallback or "legal_reference").strip().lower().replace(" ", "_")
+    if normalized == "curated":
+        return "legal_reference"
+    if normalized in NORMALIZED_SOURCE_TYPES:
+        return normalized
+    for candidate in ["standard_contract", "checklist", "guide", "law", "legal_reference"]:
+        if candidate in normalized:
+            return candidate
+    return "legal_reference"
 
 
 def _manifest_title(items: list[dict]) -> str:

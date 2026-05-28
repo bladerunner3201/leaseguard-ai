@@ -23,7 +23,7 @@ public class MessageSource {
     @JoinColumn(name = "message_id", nullable = false)
     private ChatMessage message;
 
-    @Column(name = "source_type", length = 30)
+    @Column(name = "source_type", length = 100, nullable = false)
     private String sourceType;
 
     @Column(name = "source_title")
