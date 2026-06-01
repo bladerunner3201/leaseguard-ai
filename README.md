@@ -57,7 +57,7 @@ LeaseGuard AI는 사용자가 계약서를 업로드하면 계약서 원문에�
 
 ## 3. 화면 예시
 
-실제 스크린샷 파일은 추후 `docs/screenshots/` 경로에 저장할 수 있다. README에는 제출용 문서 구성을 위해 placeholder 경로를 둔다.
+실제 스크린샷 파일은 `docs/screenshots/` 경로에 저장되어 있다.
 
 ### 3.1 계약서 업로드 화면
 
