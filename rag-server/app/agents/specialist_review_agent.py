@@ -1,3 +1,5 @@
+import asyncio
+
 from app.schemas.chat_schema import RagSource
 from app.schemas.review_schema import ReviewSource, SpecialistFinding, SpecialistReviewResult
 from app.services.retrieval_service import retrieve_sources
@@ -13,7 +15,7 @@ DOMAIN_CONFIGS = {
             "Check whether the return is conditional on a new tenant moving in.",
             "Check whether delayed return or tenant right registration should be discussed.",
         ],
-        "high_markers": ["new tenant", "move in", "after a new tenant", "신규", "새 임차", "입주 후"],
+        "high_markers": ["new tenant", "move in", "after a new tenant", "신규", "새 임차인", "입주 후"],
         "reason": "If deposit return depends on a new tenant or another uncertain event, repayment may be delayed after lease termination.",
     },
     "special_clause": {
@@ -79,7 +81,7 @@ DOMAIN_CONFIGS = {
             "Compare special clauses with standard contract expectations.",
             "Confirm whether important responsibilities are clearly allocated.",
         ],
-        "high_markers": ["missing", "omitted", "누락", "빠진"],
+        "high_markers": ["missing", "omitted", "누락", "빈칸"],
         "reason": "Missing or non-standard clauses may make later interpretation difficult.",
     },
 }
@@ -106,6 +108,10 @@ def review_domain(domain: str, anonymous_session_id: str, contract_id: int) -> S
         recommendations=config["checks"],
     )
     return SpecialistReviewResult(domain=domain, findings=[finding])
+
+
+async def review_domain_async(domain: str, anonymous_session_id: str, contract_id: int) -> SpecialistReviewResult:
+    return await asyncio.to_thread(review_domain, domain, anonymous_session_id, contract_id)
 
 
 def _risk_level(config: dict, contract_sources: list[RagSource]) -> str:

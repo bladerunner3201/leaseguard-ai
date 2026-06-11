@@ -56,3 +56,17 @@ class ContractReviewResponse(BaseModel):
     agentResults: AgentResults
     reportMarkdown: str
     sources: list[ReviewSource] = Field(default_factory=list)
+
+
+class ContractReviewJobStartResponse(BaseModel):
+    jobId: str
+    status: str
+    message: str
+
+
+class ContractReviewJobStatusResponse(BaseModel):
+    jobId: str
+    status: str
+    progress: int
+    result: ContractReviewResponse | None = None
+    error: str | None = None

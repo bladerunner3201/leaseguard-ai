@@ -37,7 +37,7 @@ def run_contract_review(request: ContractReviewRequest) -> ContractReviewRespons
 
     aggregated_risk = aggregate_risks(specialist_reviews)
     report_markdown = build_report(aggregated_risk, request.documentName)
-    sources = _collect_sources(specialist_reviews)
+    sources = collect_sources(specialist_reviews)
 
     return ContractReviewResponse(
         overallRiskLevel=aggregated_risk.overallRiskLevel,
@@ -52,7 +52,7 @@ def run_contract_review(request: ContractReviewRequest) -> ContractReviewRespons
     )
 
 
-def _collect_sources(specialist_reviews):
+def collect_sources(specialist_reviews):
     seen: set[tuple[str, str, str]] = set()
     sources = []
     for review in specialist_reviews:
@@ -64,3 +64,7 @@ def _collect_sources(specialist_reviews):
                 seen.add(key)
                 sources.append(source)
     return sources[:20]
+
+
+def _collect_sources(specialist_reviews):
+    return collect_sources(specialist_reviews)

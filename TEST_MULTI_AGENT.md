@@ -142,7 +142,123 @@ Expected:
 - Existing `/rag/chat` still returns `answer` and `sources`.
 - Existing `/rag/contracts/index` and `/rag/references/index` behavior remains unchanged.
 
-## 10. Validation Commands
+## 10. Async Review Job API
+
+The async review API starts multi-agent report generation as a background job and returns a `jobId` immediately.
+The current implementation uses an in-memory FastAPI job store, so job state disappears when the FastAPI process restarts.
+The response schema is kept explicit so it can later be moved to Spring Boot and MySQL persistence.
+
+### 10.1 Create Review Job
+
+```powershell
+$JobStart = Invoke-RestMethod `
+  -Method Post `
+  -Uri "$RagBaseUrl/rag/contracts/review-jobs" `
+  -ContentType "application/json; charset=utf-8" `
+  -Body (@{
+    anonymousSessionId = $SessionId
+    contractId = $ContractId
+    documentName = "sample_lease_contract.txt"
+  } | ConvertTo-Json -Depth 10)
+
+$JobId = $JobStart.jobId
+$JobStart
+```
+
+Expected:
+
+```json
+{
+  "jobId": "review-job-uuid",
+  "status": "PENDING",
+  "message": "Multi-agent review job started."
+}
+```
+
+### 10.2 Poll Job Status
+
+```powershell
+do {
+  Start-Sleep -Seconds 2
+  $JobStatus = Invoke-RestMethod `
+    -Method Get `
+    -Uri "$RagBaseUrl/rag/contracts/review-jobs/$JobId"
+
+  "status=$($JobStatus.status), progress=$($JobStatus.progress)"
+} while ($JobStatus.status -eq "PENDING" -or $JobStatus.status -eq "RUNNING")
+
+$JobStatus.status
+$JobStatus.progress
+$JobStatus.result.overallRiskLevel
+$JobStatus.result.summary
+$JobStatus.result.reportMarkdown
+$JobStatus.error
+```
+
+Expected progress values are updated by stage:
+
+| Progress | Stage |
+| --- | --- |
+| 10 | Job started |
+| 25 | Supervisor completed |
+| 50 | Specialist review completed |
+| 75 | Risk aggregation completed |
+| 90 | Report writing |
+| 100 | Completed |
+
+### 10.3 Completed Result Shape
+
+```json
+{
+  "jobId": "review-job-uuid",
+  "status": "COMPLETED",
+  "progress": 100,
+  "result": {
+    "overallRiskLevel": "CAUTION",
+    "summary": "...",
+    "agentResults": {},
+    "reportMarkdown": "...",
+    "sources": []
+  },
+  "error": null
+}
+```
+
+### 10.4 Failure Case: Contract Not Indexed
+
+```powershell
+$FailedJobStart = Invoke-RestMethod `
+  -Method Post `
+  -Uri "$RagBaseUrl/rag/contracts/review-jobs" `
+  -ContentType "application/json; charset=utf-8" `
+  -Body (@{
+    anonymousSessionId = "missing-session"
+    contractId = 999999
+    documentName = "missing_contract.txt"
+  } | ConvertTo-Json -Depth 10)
+
+$FailedJobId = $FailedJobStart.jobId
+Start-Sleep -Seconds 2
+
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "$RagBaseUrl/rag/contracts/review-jobs/$FailedJobId"
+```
+
+Expected:
+
+- `status` is `FAILED`.
+- `error` contains `계약서가 인덱싱되지 않았거나 검색 가능한 chunk가 없습니다.`
+
+### 10.5 Sync Review vs Async Review
+
+| API | Behavior | Use Case |
+| --- | --- | --- |
+| `POST /rag/contracts/review` | Waits until the full report is generated and returns the result in the same response. | Direct FastAPI testing or small reports. |
+| `POST /rag/contracts/review-jobs` | Starts background report generation and returns `jobId` immediately. | Long-running multi-agent review flows. |
+| `GET /rag/contracts/review-jobs/{jobId}` | Polls status, progress, result, and error. | Frontend or backend polling integration. |
+
+## 11. Validation Commands
 
 ```powershell
 cd rag-server
