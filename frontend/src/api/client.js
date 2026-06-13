@@ -86,6 +86,16 @@ export async function deleteContract(contractId) {
   });
 }
 
+export async function startReviewJob(contractId) {
+  return apiFetch(`/api/v1/contracts/${contractId}/review-jobs`, {
+    method: 'POST',
+  });
+}
+
+export async function getReviewJob(contractId, jobId) {
+  return apiFetch(`/api/v1/contracts/${contractId}/review-jobs/${jobId}`);
+}
+
 export async function createChatSession({ contractId, title }) {
   return apiFetch('/api/v1/chat-sessions', {
     method: 'POST',

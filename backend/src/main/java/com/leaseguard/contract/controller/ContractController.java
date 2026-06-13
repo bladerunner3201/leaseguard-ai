@@ -5,6 +5,8 @@ import com.leaseguard.contract.dto.ContractResponse;
 import com.leaseguard.contract.dto.ContractUploadResponse;
 import com.leaseguard.contract.service.ContractService;
 import com.leaseguard.global.response.ApiResponse;
+import com.leaseguard.rag.dto.ContractReviewJobStartResponse;
+import com.leaseguard.rag.dto.ContractReviewJobStatusResponse;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -66,5 +68,22 @@ public class ContractController {
     ) {
         contractService.deleteContract(anonymousSessionId, contractId);
         return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/{contractId}/review-jobs")
+    public ApiResponse<ContractReviewJobStartResponse> startReviewJob(
+            @RequestHeader(SESSION_HEADER) String anonymousSessionId,
+            @PathVariable Long contractId
+    ) {
+        return ApiResponse.ok(contractService.startReviewJob(anonymousSessionId, contractId));
+    }
+
+    @GetMapping("/{contractId}/review-jobs/{jobId}")
+    public ApiResponse<ContractReviewJobStatusResponse> getReviewJob(
+            @RequestHeader(SESSION_HEADER) String anonymousSessionId,
+            @PathVariable Long contractId,
+            @PathVariable String jobId
+    ) {
+        return ApiResponse.ok(contractService.getReviewJob(anonymousSessionId, contractId, jobId));
     }
 }

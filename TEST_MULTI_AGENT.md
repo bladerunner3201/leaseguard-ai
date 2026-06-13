@@ -258,7 +258,100 @@ Expected:
 | `POST /rag/contracts/review-jobs` | Starts background report generation and returns `jobId` immediately. | Long-running multi-agent review flows. |
 | `GET /rag/contracts/review-jobs/{jobId}` | Polls status, progress, result, and error. | Frontend or backend polling integration. |
 
-## 11. Validation Commands
+## 11. Spring Boot Review Job Proxy
+
+Spring Boot exposes the FastAPI async job flow through contract-scoped APIs.
+The backend checks the current `X-Anonymous-Session-Id` against the contract owner before calling FastAPI.
+Deleted contracts are rejected by the existing contract ownership lookup.
+
+### 11.1 Start Job Through Spring Boot
+
+```powershell
+$BackendBaseUrl = "http://localhost:8080"
+
+$SpringJobStart = Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BackendBaseUrl/api/v1/contracts/$ContractId/review-jobs" `
+  -Headers @{ "X-Anonymous-Session-Id" = $SessionId }
+
+$SpringJobId = $SpringJobStart.data.jobId
+$SpringJobStart.data
+```
+
+### 11.2 Poll Job Through Spring Boot
+
+```powershell
+do {
+  Start-Sleep -Seconds 2
+  $SpringJobStatus = Invoke-RestMethod `
+    -Method Get `
+    -Uri "$BackendBaseUrl/api/v1/contracts/$ContractId/review-jobs/$SpringJobId" `
+    -Headers @{ "X-Anonymous-Session-Id" = $SessionId }
+
+  "status=$($SpringJobStatus.data.status), progress=$($SpringJobStatus.data.progress)"
+} while ($SpringJobStatus.data.status -eq "PENDING" -or $SpringJobStatus.data.status -eq "RUNNING")
+
+$SpringJobStatus.data.result.overallRiskLevel
+$SpringJobStatus.data.result.summary
+$SpringJobStatus.data.result.reportMarkdown
+```
+
+### 11.3 Authorization and Deleted Contract Checks
+
+Different anonymous session access should return `403`.
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BackendBaseUrl/api/v1/contracts/$ContractId/review-jobs" `
+  -Headers @{ "X-Anonymous-Session-Id" = "other-session-id" }
+```
+
+Deleted contract access should return `404` after the contract is soft deleted.
+
+```powershell
+Invoke-RestMethod `
+  -Method Delete `
+  -Uri "$BackendBaseUrl/api/v1/contracts/$ContractId" `
+  -Headers @{ "X-Anonymous-Session-Id" = $SessionId }
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BackendBaseUrl/api/v1/contracts/$ContractId/review-jobs" `
+  -Headers @{ "X-Anonymous-Session-Id" = $SessionId }
+```
+
+## 12. React Integration
+
+The analysis result screen includes an `AI 종합 검토 리포트 생성` button.
+The UI starts a Spring Boot review job, polls job status, maps numeric progress to user-facing status text, and displays `reportMarkdown` with preserved line breaks.
+
+Progress text mapping:
+
+| Progress | UI Text |
+| --- | --- |
+| 0-20 | 분석 준비 중 |
+| 21-50 | 전문 에이전트 검토 중 |
+| 51-75 | 위험도 종합 중 |
+| 76-99 | 리포트 작성 중 |
+| 100 | 완료 |
+
+The report area displays:
+
+- Overall risk level
+- Summary
+- Markdown report text
+- Source excerpts
+- Expandable agent trace
+
+## 13. Current Limitations
+
+- FastAPI review jobs are stored in memory in this stage.
+- Restarting the FastAPI server removes pending and completed job state.
+- Spring Boot currently proxies job results to React and does not persist completed reports in MySQL.
+- The schema is explicit enough to later move job/result persistence into Spring Boot and MySQL.
+
+## 14. Validation Commands
 
 ```powershell
 cd rag-server

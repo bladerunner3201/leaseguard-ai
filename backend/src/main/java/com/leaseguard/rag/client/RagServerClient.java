@@ -2,6 +2,9 @@ package com.leaseguard.rag.client;
 
 import com.leaseguard.rag.dto.ContractAnalyzeRequest;
 import com.leaseguard.rag.dto.ContractAnalyzeResponse;
+import com.leaseguard.rag.dto.ContractReviewJobStartResponse;
+import com.leaseguard.rag.dto.ContractReviewJobStatusResponse;
+import com.leaseguard.rag.dto.ContractReviewRequest;
 import com.leaseguard.rag.dto.RagChatRequest;
 import com.leaseguard.rag.dto.RagChatResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,5 +39,20 @@ public class RagServerClient {
                 .body(request)
                 .retrieve()
                 .body(RagChatResponse.class);
+    }
+
+    public ContractReviewJobStartResponse startReviewJob(ContractReviewRequest request) {
+        return restClient.post()
+                .uri("/rag/contracts/review-jobs")
+                .body(request)
+                .retrieve()
+                .body(ContractReviewJobStartResponse.class);
+    }
+
+    public ContractReviewJobStatusResponse getReviewJob(String jobId) {
+        return restClient.get()
+                .uri("/rag/contracts/review-jobs/{jobId}", jobId)
+                .retrieve()
+                .body(ContractReviewJobStatusResponse.class);
     }
 }

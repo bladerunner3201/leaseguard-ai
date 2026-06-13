@@ -18,6 +18,9 @@ import com.leaseguard.global.exception.NotFoundException;
 import com.leaseguard.rag.client.RagServerClient;
 import com.leaseguard.rag.dto.ContractAnalyzeRequest;
 import com.leaseguard.rag.dto.ContractAnalyzeResponse;
+import com.leaseguard.rag.dto.ContractReviewJobStartResponse;
+import com.leaseguard.rag.dto.ContractReviewJobStatusResponse;
+import com.leaseguard.rag.dto.ContractReviewRequest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -136,6 +139,26 @@ public class ContractService {
     public void deleteContract(String anonymousSessionId, Long contractId) {
         Contract contract = findOwnedContract(anonymousSessionId, contractId);
         contract.updateStatus("DELETED");
+    }
+
+    @Transactional(readOnly = true)
+    public ContractReviewJobStartResponse startReviewJob(String anonymousSessionId, Long contractId) {
+        Contract contract = findOwnedContract(anonymousSessionId, contractId);
+        return ragServerClient.startReviewJob(new ContractReviewRequest(
+                anonymousSessionId,
+                contract.getContractId(),
+                contract.getOriginalFileName()
+        ));
+    }
+
+    @Transactional(readOnly = true)
+    public ContractReviewJobStatusResponse getReviewJob(
+            String anonymousSessionId,
+            Long contractId,
+            String jobId
+    ) {
+        findOwnedContract(anonymousSessionId, contractId);
+        return ragServerClient.getReviewJob(jobId);
     }
 
     @Transactional(readOnly = true)

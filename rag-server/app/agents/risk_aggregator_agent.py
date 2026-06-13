@@ -44,6 +44,6 @@ def _overall_risk_level(findings: list[SpecialistFinding]) -> str:
 
 def _summary(overall_risk_level: str, top_risks: list[SpecialistFinding]) -> str:
     if not top_risks:
-        return "No major review findings were generated from the current indexed contract chunks."
+        return "현재 인덱싱된 계약서 조각에서는 주요 검토 항목이 뚜렷하게 생성되지 않았습니다."
     risk_titles = ", ".join(finding.title for finding in top_risks)
-    return f"Overall risk level is {overall_risk_level}. Key review items include: {risk_titles}."
+    return f"종합 위험도는 {overall_risk_level}입니다. 주요 확인 항목은 {risk_titles}입니다."
