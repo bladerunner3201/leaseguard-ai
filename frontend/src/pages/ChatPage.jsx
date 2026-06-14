@@ -201,7 +201,7 @@ export default function ChatPage({ navigate, contractResult, chatSession, setCha
       <form className="chat-form" onSubmit={handleSubmit}>
         <input
           value={input}
-          placeholder="Ask about deposit return terms"
+          placeholder="보증금 반환 조건이 위험한지 질문해 보세요"
           disabled={sending}
           onChange={(event) => setInput(event.target.value)}
         />
