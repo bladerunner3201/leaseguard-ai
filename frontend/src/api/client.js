@@ -1,5 +1,6 @@
 const SESSION_STORAGE_KEY = 'anonymousSessionId';
 export const CHAT_SESSION_STORAGE_KEY = 'leaseguardChatSessionsByContract';
+export const REVIEW_JOB_STORAGE_PREFIX = 'leaseguard-review-job-';
 
 export function getAnonymousSessionId() {
   return localStorage.getItem(SESSION_STORAGE_KEY);
@@ -15,6 +16,9 @@ export function setAnonymousSessionId(anonymousSessionId) {
 export function clearAnonymousSession() {
   localStorage.removeItem(SESSION_STORAGE_KEY);
   localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith(REVIEW_JOB_STORAGE_PREFIX))
+    .forEach((key) => localStorage.removeItem(key));
 }
 
 async function parseResponse(response) {
@@ -94,6 +98,10 @@ export async function startReviewJob(contractId) {
 
 export async function getReviewJob(contractId, jobId) {
   return apiFetch(`/api/v1/contracts/${contractId}/review-jobs/${jobId}`);
+}
+
+export async function getReviewReport(contractId) {
+  return apiFetch(`/api/v1/contracts/${contractId}/review-report`);
 }
 
 export async function createChatSession({ contractId, title }) {

@@ -346,12 +346,128 @@ The report area displays:
 
 ## 13. Current Limitations
 
-- FastAPI review jobs are stored in memory in this stage.
-- Restarting the FastAPI server removes pending and completed job state.
-- Spring Boot currently proxies job results to React and does not persist completed reports in MySQL.
-- The schema is explicit enough to later move job/result persistence into Spring Boot and MySQL.
+- FastAPI review jobs are stored in memory and are used only for in-progress job state.
+- Completed multi-agent reports are persisted by Spring Boot in MySQL through `contract_review_reports`.
+- Restarting the FastAPI server can remove in-progress job state, but completed reports already saved in MySQL remain available.
+- React does not store completed report body, `agentResults`, or `sources` in `localStorage`.
+- React stores only `anonymousSessionId`, contract-specific `chatSessionId`, and in-progress `reviewJobId`.
 
-## 14. Validation Commands
+## 14. Persistent Review Report Flow
+
+Completed reports use Spring Boot/MySQL as the source of truth.
+
+Flow:
+
+1. React calls `POST /api/v1/contracts/{contractId}/review-jobs`.
+2. Spring Boot starts a FastAPI review job.
+3. React polls `GET /api/v1/contracts/{contractId}/review-jobs/{jobId}`.
+4. When FastAPI returns `COMPLETED` with `result`, Spring Boot saves the report to `contract_review_reports`.
+5. React receives `savedReviewReport` and displays the saved DB report.
+6. On page reload, React calls `GET /api/v1/contracts/{contractId}/review-report` and displays the latest saved report.
+
+Stored fields:
+
+- `jobId`
+- `status`
+- `overallRiskLevel`
+- `summary`
+- `reportMarkdown`
+- `agentResultsJson`
+- `sourcesJson`
+- `createdAt`
+- `updatedAt`
+
+The same `jobId` is saved only once. Repeated polling for a completed job returns the existing saved report.
+If a new report generation fails, the previous saved report remains available.
+
+### 14.1 Get Latest Saved Report
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "$BackendBaseUrl/api/v1/contracts/$ContractId/review-report" `
+  -Headers @{ "X-Anonymous-Session-Id" = $SessionId }
+```
+
+Expected:
+
+```json
+{
+  "success": true,
+  "data": {
+    "reviewReportId": 1,
+    "contractId": 28,
+    "jobId": "review-job-uuid",
+    "status": "COMPLETED",
+    "overallRiskLevel": "CAUTION",
+    "summary": "...",
+    "reportMarkdown": "...",
+    "agentResults": {},
+    "sources": [],
+    "createdAt": "...",
+    "updatedAt": "..."
+  },
+  "message": null
+}
+```
+
+### 14.2 Poll and Save Completed Job
+
+```powershell
+do {
+  Start-Sleep -Seconds 2
+  $SpringJobStatus = Invoke-RestMethod `
+    -Method Get `
+    -Uri "$BackendBaseUrl/api/v1/contracts/$ContractId/review-jobs/$SpringJobId" `
+    -Headers @{ "X-Anonymous-Session-Id" = $SessionId }
+
+  "status=$($SpringJobStatus.data.status), progress=$($SpringJobStatus.data.progress), saved=$($null -ne $SpringJobStatus.data.savedReviewReport)"
+} while ($SpringJobStatus.data.status -eq "PENDING" -or $SpringJobStatus.data.status -eq "RUNNING")
+
+$SpringJobStatus.data.savedReviewReport.reviewReportId
+```
+
+Expected:
+
+- `savedReviewReport` is present when status is `COMPLETED`.
+- Calling the same polling URL again does not insert a duplicate row for the same `jobId`.
+- If FastAPI loses an in-memory job after restart, the latest saved report can still be loaded through `/review-report`.
+
+### 14.3 Deleted Contract and Authorization Checks
+
+Deleted contracts should not allow saved report lookup or new job creation.
+Different anonymous sessions should receive `403`.
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "$BackendBaseUrl/api/v1/contracts/$ContractId/review-report" `
+  -Headers @{ "X-Anonymous-Session-Id" = "other-session-id" }
+```
+
+Expected:
+
+- Different anonymous session: `403`
+- Missing contract: `404`
+- Deleted contract: `404`
+
+## 15. Frontend Persistence Rules
+
+On `AnalysisPage` entry:
+
+- React calls `GET /api/v1/contracts/{contractId}/review-report`.
+- If a saved report exists, it is displayed immediately.
+- If no saved report exists, the page shows that no comprehensive report has been generated yet.
+- If `leaseguard-review-job-{contractId}` exists in `localStorage`, polling resumes.
+
+During regeneration:
+
+- Existing saved report remains visible.
+- Download buttons continue to use the saved report.
+- The saved report is replaced only after a new job completes and Spring Boot returns `savedReviewReport`.
+- If regeneration fails, the existing saved report remains visible.
+
+## 16. Validation Commands
 
 ```powershell
 cd rag-server

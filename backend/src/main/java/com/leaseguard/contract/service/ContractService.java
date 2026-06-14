@@ -8,10 +8,14 @@ import com.leaseguard.anonymous.repository.AnonymousSessionRepository;
 import com.leaseguard.contract.dto.ContractAnalysisResponse;
 import com.leaseguard.contract.dto.ContractResponse;
 import com.leaseguard.contract.dto.ContractUploadResponse;
+import com.leaseguard.contract.dto.ReviewJobResponse;
+import com.leaseguard.contract.dto.ReviewReportResponse;
 import com.leaseguard.contract.entity.Contract;
 import com.leaseguard.contract.entity.ContractAnalysisResult;
+import com.leaseguard.contract.entity.ContractReviewReport;
 import com.leaseguard.contract.repository.ContractAnalysisResultRepository;
 import com.leaseguard.contract.repository.ContractRepository;
+import com.leaseguard.contract.repository.ContractReviewReportRepository;
 import com.leaseguard.global.exception.BadRequestException;
 import com.leaseguard.global.exception.ForbiddenException;
 import com.leaseguard.global.exception.NotFoundException;
@@ -27,6 +31,7 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -40,6 +45,7 @@ public class ContractService {
     private final AnonymousSessionRepository anonymousSessionRepository;
     private final ContractRepository contractRepository;
     private final ContractAnalysisResultRepository analysisResultRepository;
+    private final ContractReviewReportRepository reviewReportRepository;
     private final RagServerClient ragServerClient;
     private final ObjectMapper objectMapper;
     private final Path uploadRoot;
@@ -48,6 +54,7 @@ public class ContractService {
             AnonymousSessionRepository anonymousSessionRepository,
             ContractRepository contractRepository,
             ContractAnalysisResultRepository analysisResultRepository,
+            ContractReviewReportRepository reviewReportRepository,
             RagServerClient ragServerClient,
             ObjectMapper objectMapper,
             @Value("${file.upload-root:uploads}") String uploadRoot
@@ -55,6 +62,7 @@ public class ContractService {
         this.anonymousSessionRepository = anonymousSessionRepository;
         this.contractRepository = contractRepository;
         this.analysisResultRepository = analysisResultRepository;
+        this.reviewReportRepository = reviewReportRepository;
         this.ragServerClient = ragServerClient;
         this.objectMapper = objectMapper;
         this.uploadRoot = Path.of(uploadRoot).toAbsolutePath().normalize();
@@ -151,14 +159,39 @@ public class ContractService {
         ));
     }
 
+    @Transactional
+    public ReviewJobResponse getReviewJob(String anonymousSessionId, Long contractId, String jobId) {
+        Contract contract = findOwnedContract(anonymousSessionId, contractId);
+        ReviewReportResponse alreadySaved = findSavedReviewReportByJobId(contract.getContractId(), jobId);
+        if (alreadySaved != null) {
+            return new ReviewJobResponse(jobId, "COMPLETED", 100, null, alreadySaved, null);
+        }
+
+        ContractReviewJobStatusResponse jobStatus;
+        try {
+            jobStatus = ragServerClient.getReviewJob(jobId);
+        } catch (RestClientResponseException exception) {
+            ReviewReportResponse latestReport = findLatestReviewReportOrNull(contract.getContractId());
+            String message = "진행 중이던 리포트 생성 작업을 찾을 수 없습니다. 필요하면 다시 생성해 주세요.";
+            if (latestReport != null) {
+                return ReviewJobResponse.failedWithSavedReport(jobId, message, latestReport);
+            }
+            throw new NotFoundException(message);
+        }
+
+        ReviewReportResponse savedReviewReport = null;
+        if ("COMPLETED".equals(jobStatus.status()) && jobStatus.result() != null) {
+            savedReviewReport = saveCompletedReviewReport(contract, jobStatus);
+        }
+        return ReviewJobResponse.of(jobStatus, savedReviewReport);
+    }
+
     @Transactional(readOnly = true)
-    public ContractReviewJobStatusResponse getReviewJob(
-            String anonymousSessionId,
-            Long contractId,
-            String jobId
-    ) {
-        findOwnedContract(anonymousSessionId, contractId);
-        return ragServerClient.getReviewJob(jobId);
+    public ReviewReportResponse getLatestReviewReport(String anonymousSessionId, Long contractId) {
+        Contract contract = findOwnedContract(anonymousSessionId, contractId);
+        return reviewReportRepository.findFirstByContractContractIdOrderByUpdatedAtDesc(contract.getContractId())
+                .map(this::toReviewReportResponse)
+                .orElseThrow(() -> new NotFoundException("저장된 멀티에이전트 리포트가 없습니다."));
     }
 
     @Transactional(readOnly = true)
@@ -234,6 +267,83 @@ public class ContractService {
             });
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("위험 항목 역직렬화에 실패했습니다.", exception);
+        }
+    }
+
+    private ReviewReportResponse saveCompletedReviewReport(
+            Contract contract,
+            ContractReviewJobStatusResponse jobStatus
+    ) {
+        return reviewReportRepository.findByContractContractIdAndJobId(contract.getContractId(), jobStatus.jobId())
+                .map(this::toReviewReportResponse)
+                .orElseGet(() -> {
+                    ContractReviewJobStatusResponse.ContractReviewResult result = jobStatus.result();
+                    LocalDateTime now = LocalDateTime.now();
+                    ContractReviewReport report = reviewReportRepository.save(new ContractReviewReport(
+                            contract,
+                            jobStatus.jobId(),
+                            jobStatus.status(),
+                            result.overallRiskLevel(),
+                            result.summary(),
+                            result.reportMarkdown(),
+                            writeJson(result.agentResults()),
+                            writeJson(result.sources()),
+                            now,
+                            now
+                    ));
+                    return toReviewReportResponse(report);
+                });
+    }
+
+    private ReviewReportResponse findSavedReviewReportByJobId(Long contractId, String jobId) {
+        return reviewReportRepository.findByContractContractIdAndJobId(contractId, jobId)
+                .map(this::toReviewReportResponse)
+                .orElse(null);
+    }
+
+    private ReviewReportResponse findLatestReviewReportOrNull(Long contractId) {
+        return reviewReportRepository.findFirstByContractContractIdOrderByUpdatedAtDesc(contractId)
+                .map(this::toReviewReportResponse)
+                .orElse(null);
+    }
+
+    private ReviewReportResponse toReviewReportResponse(ContractReviewReport report) {
+        return ReviewReportResponse.of(
+                report,
+                readAgentResults(report.getAgentResultsJson()),
+                readSources(report.getSourcesJson())
+        );
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("멀티에이전트 리포트 JSON 저장에 실패했습니다.", exception);
+        }
+    }
+
+    private Map<String, Object> readAgentResults(String agentResultsJson) {
+        if (agentResultsJson == null || agentResultsJson.isBlank() || "null".equals(agentResultsJson)) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(agentResultsJson, new TypeReference<>() {
+            });
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("멀티에이전트 agentResults JSON 복원에 실패했습니다.", exception);
+        }
+    }
+
+    private List<ContractReviewJobStatusResponse.ReviewSource> readSources(String sourcesJson) {
+        if (sourcesJson == null || sourcesJson.isBlank() || "null".equals(sourcesJson)) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(sourcesJson, new TypeReference<>() {
+            });
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("멀티에이전트 sources JSON 복원에 실패했습니다.", exception);
         }
     }
 }

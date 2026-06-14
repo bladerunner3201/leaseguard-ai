@@ -13,12 +13,14 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
 button:disabled,
-input:disabled {
+input:disabled,
+select:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }
@@ -365,6 +367,44 @@ blockquote {
   padding-top: 18px;
 }
 
+.report-download {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #dfe4ea;
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 16px;
+}
+
+.download-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.download-controls select {
+  min-width: 150px;
+  height: 44px;
+  border: 1px solid #cbd3dc;
+  border-radius: 8px;
+  background: white;
+  color: #1d2433;
+  padding: 0 12px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
 .markdown-report {
   display: grid;
   gap: 12px;
@@ -462,5 +502,53 @@ blockquote {
 
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  :root,
+  body {
+    background: white;
+    color: #111827;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .printable-report,
+  .printable-report * {
+    visibility: visible;
+  }
+
+  .printable-report {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: 0;
+    padding: 0;
+  }
+
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+
+  .page {
+    width: 100%;
+    min-height: auto;
+    padding: 0;
+  }
+
+  .panel,
+  .review-report,
+  .markdown-report {
+    border: 0;
+    background: white;
+    box-shadow: none;
+  }
+
+  .markdown-report {
+    padding: 0;
   }
 }

@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
-import { FileText, FolderOpen, MessageCircle, Upload } from 'lucide-react';
+import { Download, FileText, FolderOpen, MessageCircle, Upload } from 'lucide-react';
 
-import { getReviewJob, startReviewJob } from '../api/client.js';
+import { getReviewJob, getReviewReport, REVIEW_JOB_STORAGE_PREFIX, startReviewJob } from '../api/client.js';
+
+const REPORT_CAUTION_TEXT = '본 리포트는 법률 자문이 아니라 참고용 위험 점검입니다.';
 
 function RiskBadge({ level }) {
   return <span className={`risk-badge ${String(level || '').toLowerCase()}`}>{level || 'UNKNOWN'}</span>;
+}
+
+function getReviewJobStorageKey(contractId) {
+  return `${REVIEW_JOB_STORAGE_PREFIX}${contractId}`;
 }
 
 function getProgressLabel(progress = 0, status = '') {
@@ -25,6 +31,59 @@ function getProgressLabel(progress = 0, status = '') {
 
 function normalizeMarkdownLine(line) {
   return line.replace(/\*\*/g, '').trim();
+}
+
+function stripMarkdown(markdown) {
+  return String(markdown || '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*]\s+/gm, '- ')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+    .trim();
+}
+
+function downloadTextFile(filename, content, mimeType) {
+  const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildReportDownloadContent({ contract, result, format }) {
+  const generatedAt = new Date().toLocaleString('ko-KR');
+  const header = [
+    '# LeaseGuard AI 멀티에이전트 종합 검토 리포트',
+    '',
+    `- 생성일시: ${generatedAt}`,
+    `- 계약서 파일명: ${contract?.originalFileName || '알 수 없음'}`,
+    `- 계약서 ID: ${contract?.contractId || '알 수 없음'}`,
+    `- 전체 위험도: ${result?.overallRiskLevel || 'UNKNOWN'}`,
+    result?.createdAt ? `- 저장일시: ${new Date(result.createdAt).toLocaleString('ko-KR')}` : null,
+    result?.updatedAt ? `- 마지막 갱신: ${new Date(result.updatedAt).toLocaleString('ko-KR')}` : null,
+    '',
+    '## 요약',
+    result?.summary || '',
+    '',
+    '## 리포트 본문',
+    result?.reportMarkdown || '',
+    '',
+    '## 주의 문구',
+    REPORT_CAUTION_TEXT,
+    '',
+  ].filter((line) => line !== null).join('\n');
+
+  if (format === 'txt') {
+    return stripMarkdown(header);
+  }
+  return header;
 }
 
 function MarkdownReport({ markdown }) {
@@ -94,6 +153,51 @@ function MarkdownReport({ markdown }) {
   return <div className="markdown-report">{elements}</div>;
 }
 
+function ReportDownloadPanel({ contract, result }) {
+  const [format, setFormat] = useState('markdown');
+
+  const handleDownload = () => {
+    if (!result) {
+      return;
+    }
+    const contractId = contract?.contractId || 'unknown';
+    if (format === 'pdf') {
+      window.print();
+      return;
+    }
+    if (format === 'txt') {
+      const content = buildReportDownloadContent({ contract, result, format: 'txt' });
+      downloadTextFile(`leaseguard-review-contract-${contractId}.txt`, content, 'text/plain');
+      return;
+    }
+    const content = buildReportDownloadContent({ contract, result, format: 'markdown' });
+    downloadTextFile(`leaseguard-review-contract-${contractId}.md`, content, 'text/markdown');
+  };
+
+  return (
+    <section className="report-download no-print">
+      <div>
+        <h3>리포트 다운로드</h3>
+        <p className="muted">저장된 종합 리포트를 Markdown, TXT, PDF 형식으로 저장할 수 있습니다.</p>
+      </div>
+      <div className="download-controls">
+        <label>
+          <span className="sr-only">다운로드 형식</span>
+          <select value={format} onChange={(event) => setFormat(event.target.value)}>
+            <option value="markdown">Markdown</option>
+            <option value="txt">TXT</option>
+            <option value="pdf">PDF</option>
+          </select>
+        </label>
+        <button className="secondary-button" type="button" onClick={handleDownload}>
+          <Download size={18} />
+          다운로드
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function SourcePreview({ source }) {
   const [expanded, setExpanded] = useState(false);
   const text = source.chunkText || '';
@@ -121,7 +225,7 @@ function AgentTrace({ result }) {
   const aggregatedRisk = agentResults.aggregatedRisk || {};
 
   return (
-    <details className="agent-trace">
+    <details className="agent-trace no-print">
       <summary>에이전트 검토 과정 보기</summary>
       <div className="agent-trace-grid">
         <div>
@@ -156,39 +260,98 @@ function AgentTrace({ result }) {
 }
 
 export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
+  const [savedReviewReport, setSavedReviewReport] = useState(null);
   const [reviewJob, setReviewJob] = useState(null);
   const [reviewError, setReviewError] = useState('');
+  const [loadingSavedReport, setLoadingSavedReport] = useState(false);
   const [startingReview, setStartingReview] = useState(false);
 
-  useEffect(() => {
-    setReviewJob(null);
-    setReviewError('');
-  }, [contractResult?.contract?.contractId]);
+  const contractId = contractResult?.contract?.contractId;
 
   useEffect(() => {
-    if (!reviewJob?.jobId || !contractResult?.contract?.contractId) {
+    setSavedReviewReport(null);
+    setReviewJob(null);
+    setReviewError('');
+
+    if (!contractId) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadSavedReport = async () => {
+      setLoadingSavedReport(true);
+      try {
+        const report = await getReviewReport(contractId);
+        if (!cancelled) {
+          setSavedReviewReport(report);
+        }
+      } catch {
+        if (!cancelled) {
+          setSavedReviewReport(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSavedReport(false);
+        }
+      }
+    };
+
+    loadSavedReport();
+
+    const storedJobId = localStorage.getItem(getReviewJobStorageKey(contractId));
+    if (storedJobId) {
+      setReviewJob({
+        jobId: storedJobId,
+        status: 'RUNNING',
+        progress: 0,
+        result: null,
+        savedReviewReport: null,
+        error: null,
+      });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contractId]);
+
+  useEffect(() => {
+    if (!reviewJob?.jobId || !contractId) {
       return undefined;
     }
     if (reviewJob.status !== 'PENDING' && reviewJob.status !== 'RUNNING') {
       return undefined;
     }
 
-    const contractId = contractResult.contract.contractId;
     const intervalId = window.setInterval(async () => {
       try {
         const nextJob = await getReviewJob(contractId, reviewJob.jobId);
         setReviewJob(nextJob);
+
+        if (nextJob.savedReviewReport) {
+          setSavedReviewReport(nextJob.savedReviewReport);
+        }
+
+        if (nextJob.status === 'COMPLETED') {
+          localStorage.removeItem(getReviewJobStorageKey(contractId));
+        }
+
         if (nextJob.status === 'FAILED') {
-          setReviewError(nextJob.error || '리포트 생성 중 오류가 발생했습니다.');
+          localStorage.removeItem(getReviewJobStorageKey(contractId));
+          setReviewError(nextJob.error || '새 리포트 생성에 실패했습니다. 기존 리포트를 계속 표시합니다.');
+          if (nextJob.savedReviewReport) {
+            setSavedReviewReport(nextJob.savedReviewReport);
+          }
         }
       } catch (error) {
-        setReviewError(error.message);
+        localStorage.removeItem(getReviewJobStorageKey(contractId));
+        setReviewError(error.message || '진행 중이던 리포트 생성 상태를 확인할 수 없습니다.');
         window.clearInterval(intervalId);
       }
     }, 2000);
 
     return () => window.clearInterval(intervalId);
-  }, [contractResult?.contract?.contractId, reviewJob?.jobId, reviewJob?.status]);
+  }, [contractId, reviewJob?.jobId, reviewJob?.status]);
 
   if (!contractResult) {
     return (
@@ -212,19 +375,29 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
   }
 
   const { contract, analysis } = contractResult;
-  const reviewResult = reviewJob?.result;
+  const reviewResult = savedReviewReport;
   const progress = reviewJob?.progress || 0;
   const isReviewRunning = startingReview || reviewJob?.status === 'PENDING' || reviewJob?.status === 'RUNNING';
 
   const handleStartReviewJob = async () => {
+    const hasExistingReport = Boolean(savedReviewReport);
+    if (hasExistingReport) {
+      const confirmed = window.confirm('기존 리포트를 새 분석 결과로 갱신합니다. 다시 생성하시겠습니까?');
+      if (!confirmed) {
+        return;
+      }
+    }
+
     setReviewError('');
     setStartingReview(true);
     try {
       const startedJob = await startReviewJob(contract.contractId);
+      localStorage.setItem(getReviewJobStorageKey(contract.contractId), startedJob.jobId);
       setReviewJob({
         ...startedJob,
         progress: 0,
         result: null,
+        savedReviewReport: null,
         error: null,
       });
     } catch (error) {
@@ -236,12 +409,12 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
 
   return (
     <section className="page stack">
-      <header className="page-header">
+      <header className="page-header no-print">
         <h1>Analysis result</h1>
         <p>확인 필요 항목과 계약서에서 발견된 근거 문장을 함께 보여줍니다.</p>
       </header>
 
-      <section className="panel stack">
+      <section className="panel stack no-print">
         <h2>Contract</h2>
         <dl className="detail-grid">
           <dt>ID</dt>
@@ -253,7 +426,7 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
         </dl>
       </section>
 
-      <section className="panel stack">
+      <section className="panel stack no-print">
         <div className="section-title">
           <h2>Risk summary</h2>
           <RiskBadge level={analysis.overallRiskLevel} />
@@ -261,7 +434,7 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
         <p>{analysis.summary}</p>
       </section>
 
-      <section className="stack">
+      <section className="stack no-print">
         <h2>Risk items</h2>
         {(analysis.riskItems || []).map((item, index) => (
           <article className="item-card" key={`${item.category}-${index}`}>
@@ -276,11 +449,11 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
         ))}
       </section>
 
-      <section className="panel stack">
-        <div className="section-title">
+      <section className="panel stack multi-agent-panel">
+        <div className="section-title no-print">
           <div>
             <h2>Hybrid Multi-Agent Report</h2>
-            <p className="muted">전문 검토 에이전트가 계약서와 reference source를 종합해 리포트를 생성합니다.</p>
+            <p className="muted">저장된 최신 리포트를 우선 표시하고, 새 리포트 생성이 완료되면 최신 결과로 갱신합니다.</p>
           </div>
           <button
             className="primary-button"
@@ -289,49 +462,65 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
             disabled={isReviewRunning}
           >
             <FileText size={18} />
-            {isReviewRunning ? '리포트 생성 중' : 'AI 종합 검토 리포트 생성'}
+            {isReviewRunning ? '새 리포트 생성 중' : reviewResult ? '다시 생성' : 'AI 종합 검토 리포트 생성'}
           </button>
         </div>
 
-        {reviewJob && (
-          <div className="review-progress">
+        {isReviewRunning && (
+          <div className="review-progress no-print">
             <div className="section-title">
-              <strong>{getProgressLabel(progress, reviewJob.status)}</strong>
-              <span className="muted">{reviewJob.status}</span>
+              <strong>{getProgressLabel(progress, reviewJob?.status)}</strong>
+              <span className="muted">{reviewJob?.status || 'RUNNING'}</span>
             </div>
             <div className="progress-bar" aria-label="Review progress">
               <span style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
             </div>
-            <p className="muted">{progress}%</p>
+            <p className="muted">
+              새 리포트를 생성하는 동안 기존 저장 리포트는 유지됩니다. {progress}%
+            </p>
           </div>
         )}
 
-        {reviewError && <p className="error-text">{reviewError}</p>}
+        {loadingSavedReport && <p className="muted no-print">저장된 리포트를 불러오는 중입니다...</p>}
+        {reviewError && <p className="error-text no-print">{reviewError}</p>}
+
+        {!loadingSavedReport && !reviewResult && (
+          <p className="muted no-print">아직 생성된 종합 리포트가 없습니다.</p>
+        )}
 
         {reviewResult && (
-          <article className="review-report stack">
-            <div className="section-title">
-              <h3>종합 리포트 결과</h3>
-              <RiskBadge level={reviewResult.overallRiskLevel} />
-            </div>
-            <p>{reviewResult.summary}</p>
-            <MarkdownReport markdown={reviewResult.reportMarkdown} />
-            <AgentTrace result={reviewResult} />
-            {(reviewResult.sources || []).length > 0 && (
-              <details className="sources sources-collapsible">
-                <summary>근거 sources 보기</summary>
-                <div className="sources-list">
-                  {(reviewResult.sources || []).slice(0, 6).map((source, index) => (
-                    <SourcePreview source={source} key={`${source.sourceTitle}-${index}`} />
-                  ))}
+          <>
+            <ReportDownloadPanel contract={contract} result={reviewResult} />
+            <article className="review-report printable-report stack">
+              <div className="section-title">
+                <div>
+                  <h3>종합 리포트 결과</h3>
+                  <p className="muted">계약서 파일명: {contract.originalFileName}</p>
+                  {reviewResult.updatedAt && (
+                    <p className="muted">마지막 생성일: {new Date(reviewResult.updatedAt).toLocaleString('ko-KR')}</p>
+                  )}
                 </div>
-              </details>
-            )}
-          </article>
+                <RiskBadge level={reviewResult.overallRiskLevel} />
+              </div>
+              <p>{reviewResult.summary}</p>
+              <MarkdownReport markdown={reviewResult.reportMarkdown} />
+              <AgentTrace result={reviewResult} />
+              {(reviewResult.sources || []).length > 0 && (
+                <details className="sources sources-collapsible no-print">
+                  <summary>근거 sources 보기</summary>
+                  <div className="sources-list">
+                    {(reviewResult.sources || []).slice(0, 6).map((source, index) => (
+                      <SourcePreview source={source} key={`${source.sourceTitle}-${index}`} />
+                    ))}
+                  </div>
+                </details>
+              )}
+            </article>
+          </>
         )}
       </section>
 
-      <div className="action-row">
+      <div className="action-row no-print">
         <button className="secondary-button" type="button" onClick={() => navigate('upload')}>
           <Upload size={18} />
           Upload another

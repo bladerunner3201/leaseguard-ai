@@ -3,10 +3,11 @@ package com.leaseguard.contract.controller;
 import com.leaseguard.contract.dto.ContractAnalysisResponse;
 import com.leaseguard.contract.dto.ContractResponse;
 import com.leaseguard.contract.dto.ContractUploadResponse;
+import com.leaseguard.contract.dto.ReviewJobResponse;
+import com.leaseguard.contract.dto.ReviewReportResponse;
 import com.leaseguard.contract.service.ContractService;
 import com.leaseguard.global.response.ApiResponse;
 import com.leaseguard.rag.dto.ContractReviewJobStartResponse;
-import com.leaseguard.rag.dto.ContractReviewJobStatusResponse;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -79,11 +80,19 @@ public class ContractController {
     }
 
     @GetMapping("/{contractId}/review-jobs/{jobId}")
-    public ApiResponse<ContractReviewJobStatusResponse> getReviewJob(
+    public ApiResponse<ReviewJobResponse> getReviewJob(
             @RequestHeader(SESSION_HEADER) String anonymousSessionId,
             @PathVariable Long contractId,
             @PathVariable String jobId
     ) {
         return ApiResponse.ok(contractService.getReviewJob(anonymousSessionId, contractId, jobId));
+    }
+
+    @GetMapping("/{contractId}/review-report")
+    public ApiResponse<ReviewReportResponse> getLatestReviewReport(
+            @RequestHeader(SESSION_HEADER) String anonymousSessionId,
+            @PathVariable Long contractId
+    ) {
+        return ApiResponse.ok(contractService.getLatestReviewReport(anonymousSessionId, contractId));
     }
 }
