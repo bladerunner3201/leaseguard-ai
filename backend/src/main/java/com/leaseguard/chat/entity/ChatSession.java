@@ -39,6 +39,12 @@ public class ChatSession {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "memory_summary", columnDefinition = "LONGTEXT")
+    private String memorySummary;
+
+    @Column(name = "memory_updated_at")
+    private LocalDateTime memoryUpdatedAt;
+
     protected ChatSession() {
     }
 
@@ -80,7 +86,20 @@ public class ChatSession {
         return updatedAt;
     }
 
+    public String getMemorySummary() {
+        return memorySummary;
+    }
+
+    public LocalDateTime getMemoryUpdatedAt() {
+        return memoryUpdatedAt;
+    }
+
     public void touch(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public void updateMemorySummary(String memorySummary, LocalDateTime memoryUpdatedAt) {
+        this.memorySummary = memorySummary;
+        this.memoryUpdatedAt = memoryUpdatedAt;
     }
 }

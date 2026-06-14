@@ -1,42 +1,160 @@
 import { ArrowLeft, FolderOpen, Send } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { createChatSession, getChatMessages, sendChatMessage } from '../api/client.js';
 
 const SOURCE_PREVIEW_LENGTH = 300;
+const SOURCE_REF_PATTERN = /\[Source\s+(\d+)\]/g;
 
-function ChatSources({ sources }) {
-  if (!sources?.length) {
+function ChatMessage({ message, messageIndex }) {
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [openSourceNumbers, setOpenSourceNumbers] = useState(() => new Set());
+  const [highlightedSource, setHighlightedSource] = useState(null);
+  const citedSourceNumbers = useMemo(() => extractCitedSourceNumbers(message.content), [message.content]);
+
+  const handleCitationClick = (sourceNumber) => {
+    setSourcesOpen(true);
+    setOpenSourceNumbers((current) => new Set([...current, sourceNumber]));
+    setHighlightedSource(sourceNumber);
+
+    window.setTimeout(() => {
+      document
+        .getElementById(getSourceElementId(messageIndex, sourceNumber))
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  };
+
+  const handleSourceToggle = (sourceNumber, isOpen) => {
+    setOpenSourceNumbers((current) => {
+      const next = new Set(current);
+      if (isOpen) {
+        next.add(sourceNumber);
+      } else {
+        next.delete(sourceNumber);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <article className={`${message.role}-message`}>
+      <strong>{message.role}</strong>
+      <MessageContent content={message.content} onCitationClick={handleCitationClick} />
+      <ChatSources
+        sources={message.sources}
+        citedSourceNumbers={citedSourceNumbers}
+        messageIndex={messageIndex}
+        isOpen={sourcesOpen}
+        onOpenChange={setSourcesOpen}
+        openSourceNumbers={openSourceNumbers}
+        highlightedSource={highlightedSource}
+        onSourceToggle={handleSourceToggle}
+      />
+    </article>
+  );
+}
+
+function MessageContent({ content, onCitationClick }) {
+  const parts = [];
+  const text = content || '';
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(SOURCE_REF_PATTERN)) {
+    const [label, numberText] = match;
+    const sourceNumber = Number(numberText);
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <button
+        className="source-citation-button"
+        type="button"
+        onClick={() => onCitationClick(sourceNumber)}
+        key={`${match.index}-${label}`}
+      >
+        {label}
+      </button>,
+    );
+    lastIndex = match.index + label.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return <p className="message-content">{parts}</p>;
+}
+
+function ChatSources({
+  sources,
+  citedSourceNumbers,
+  messageIndex,
+  isOpen,
+  onOpenChange,
+  openSourceNumbers,
+  highlightedSource,
+  onSourceToggle,
+}) {
+  const groupedSources = useMemo(
+    () => groupSources(sources || [], citedSourceNumbers),
+    [sources, citedSourceNumbers],
+  );
+  const visibleSourceCount = groupedSources.reduce((count, group) => count + group.items.length, 0);
+
+  if (!sources?.length || citedSourceNumbers.size === 0 || visibleSourceCount === 0) {
     return null;
   }
 
   return (
-    <details className="chat-sources">
-      <summary>Sources ({sources.length})</summary>
-      <div className="chat-sources-list">
-        {sources.map((source, sourceIndex) => (
-          <ChatSourceItem source={source} sourceIndex={sourceIndex} key={`${source.sourceTitle}-${sourceIndex}`} />
+    <details className="chat-sources" open={isOpen} onToggle={(event) => onOpenChange(event.currentTarget.open)}>
+      <summary>Sources ({visibleSourceCount})</summary>
+      <div className="chat-source-groups">
+        {groupedSources.map((group) => (
+          <section className="chat-source-group" key={group.key}>
+            <h4>{group.label}</h4>
+            <div className="chat-sources-list">
+              {group.items.map(({ source, sourceIndex }) => {
+                const sourceNumber = sourceIndex + 1;
+                return (
+                  <ChatSourceItem
+                    source={source}
+                    sourceNumber={sourceNumber}
+                    messageIndex={messageIndex}
+                    isOpen={openSourceNumbers.has(sourceNumber)}
+                    highlighted={highlightedSource === sourceNumber}
+                    onToggle={onSourceToggle}
+                    key={`${source.sourceTitle}-${sourceIndex}`}
+                  />
+                );
+              })}
+            </div>
+          </section>
         ))}
       </div>
     </details>
   );
 }
 
-function ChatSourceItem({ source, sourceIndex }) {
+function ChatSourceItem({ source, sourceNumber, messageIndex, isOpen, highlighted, onToggle }) {
   const [expanded, setExpanded] = useState(false);
   const chunkText = source.chunkText || '';
   const shouldTruncate = chunkText.length > SOURCE_PREVIEW_LENGTH;
   const visibleText = expanded || !shouldTruncate ? chunkText : `${chunkText.slice(0, SOURCE_PREVIEW_LENGTH)}...`;
 
   return (
-    <details className="chat-source-item">
+    <details
+      className={`chat-source-item${highlighted ? ' highlighted' : ''}`}
+      id={getSourceElementId(messageIndex, sourceNumber)}
+      open={isOpen}
+      onToggle={(event) => onToggle(sourceNumber, event.currentTarget.open)}
+    >
       <summary>
-        <span>{source.sourceTitle || `Source ${sourceIndex + 1}`}</span>
+        <span>{`Source ${sourceNumber}: ${source.sourceTitle || `Source ${sourceNumber}`}`}</span>
         <small>{source.sourceType}</small>
       </summary>
       <div className="chat-source-detail">
         <div className="section-title">
-          <span>{source.sourceType}</span>
+          <span>{`[Source ${sourceNumber}] ${source.sourceType}`}</span>
           <span>{source.similarityScore}</span>
         </div>
         <p>{visibleText}</p>
@@ -48,6 +166,45 @@ function ChatSourceItem({ source, sourceIndex }) {
       </div>
     </details>
   );
+}
+
+function groupSources(sources, citedSourceNumbers) {
+  const contractItems = [];
+  const referenceItems = [];
+
+  sources.forEach((source, sourceIndex) => {
+    const sourceNumber = sourceIndex + 1;
+    if (!citedSourceNumbers.has(sourceNumber)) {
+      return;
+    }
+
+    const item = { source, sourceIndex };
+    if (source.sourceType === 'contract') {
+      contractItems.push(item);
+    } else {
+      referenceItems.push(item);
+    }
+  });
+
+  return [
+    { key: 'contract', label: '계약서 근거', items: contractItems },
+    { key: 'reference', label: '법령/체크리스트 근거', items: referenceItems },
+  ].filter((group) => group.items.length > 0);
+}
+
+function extractCitedSourceNumbers(content) {
+  const citedNumbers = new Set();
+  const text = content || '';
+
+  for (const match of text.matchAll(SOURCE_REF_PATTERN)) {
+    citedNumbers.add(Number(match[1]));
+  }
+
+  return citedNumbers;
+}
+
+function getSourceElementId(messageIndex, sourceNumber) {
+  return `chat-message-${messageIndex}-source-${sourceNumber}`;
 }
 
 export default function ChatPage({ navigate, contractResult, chatSession, setChatSession }) {
@@ -178,16 +335,12 @@ export default function ChatPage({ navigate, contractResult, chatSession, setCha
         {loadingMessages && <div className="assistant-message">Loading saved messages...</div>}
         {!loadingMessages && messages.length === 0 && (
           <div className="assistant-message">
-            업로드한 계약서에 대해 궁금한 점을 질문하세요. 답변에는 계약서와 reference source가 함께 표시됩니다.
+            업로드한 계약서에 대해 궁금한 점을 질문하세요. 답변에는 필요한 경우 계약서와 reference source가 함께 표시됩니다.
           </div>
         )}
 
         {messages.map((message, index) => (
-          <article className={`${message.role}-message`} key={message.messageId || `${message.role}-${index}`}>
-            <strong>{message.role}</strong>
-            <p className="message-content">{message.content}</p>
-            <ChatSources sources={message.sources} />
-          </article>
+          <ChatMessage message={message} messageIndex={index} key={message.messageId || `${message.role}-${index}`} />
         ))}
 
         {sending && (
@@ -201,7 +354,7 @@ export default function ChatPage({ navigate, contractResult, chatSession, setCha
       <form className="chat-form" onSubmit={handleSubmit}>
         <input
           value={input}
-          placeholder="보증금 반환 조건이 위험한지 질문해 보세요"
+          placeholder="보증금 반환 조건이나 특약 위험을 질문해 보세요."
           disabled={sending}
           onChange={(event) => setInput(event.target.value)}
         />

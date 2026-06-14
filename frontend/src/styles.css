@@ -311,6 +311,26 @@ blockquote {
   white-space: pre-wrap;
 }
 
+.source-citation-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border: 1px solid #b8d1d2;
+  border-radius: 999px;
+  background: #f5fbfb;
+  color: #2f6f73;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  margin: 0 2px;
+  padding: 2px 7px;
+}
+
+.source-citation-button:hover {
+  background: #e4f1f1;
+}
+
 .assistant-message {
   justify-self: start;
   background: #eef5f5;
@@ -362,11 +382,38 @@ blockquote {
   margin-top: 10px;
 }
 
+.chat-source-groups {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.chat-source-group {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-source-group h4 {
+  color: #2f3747;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
 .chat-source-item {
   border: 1px solid #dfe4ea;
   border-radius: 8px;
   background: white;
   padding: 10px 12px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.chat-source-item.highlighted {
+  border-color: #2f6f73;
+  background: #f3fbfa;
+  box-shadow: 0 0 0 3px rgba(47, 111, 115, 0.14);
 }
 
 .chat-source-item summary {

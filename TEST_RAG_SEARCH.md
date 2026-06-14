@@ -269,3 +269,42 @@ cd D:\leaseguard-ai\leaseguard-ai\rag-server
 - ChromaDB vector score, metadata category bonus, keyword coverage score를 합산해 reranking한다.
 - 기존 `/rag/chat` 응답 구조인 `answer`, `sources`는 변경하지 않는다.
 - LangChain은 사용하지 않는다.
+
+## 12. Chat Memory Summary Test
+
+Spring Boot는 FastAPI에 최근 실제 메시지 8개를 전달하는 구조를 유지한다.  
+다만 긴 대화에서 후속 질문 맥락이 사라지는 문제를 줄이기 위해 `chat_sessions.memory_summary`에 세션별 핵심 이슈 메모리를 저장하고, FastAPI 호출 시 `chatHistory` 앞에 보조 assistant 메시지로 함께 전달한다.
+
+저장되는 메모리 예:
+
+```text
+현재까지의 핵심 이슈:
+- 보증금 반환: 관련 조건, 책임 범위, 확인 필요 사항이 대화에서 반복적으로 언급됨.
+- 특약/불리한 조항: 관련 조건, 책임 범위, 확인 필요 사항이 대화에서 반복적으로 언급됨.
+- 최근 질문: 그럼 내가 현실적으로 할 수 있는 일은?
+- 다음 후속 질문에서는 위 이슈를 우선 맥락으로 삼아 답변할 것.
+```
+
+MySQL 확인:
+
+```sql
+SELECT
+  chat_session_id,
+  LEFT(memory_summary, 1000) AS memory_summary_preview,
+  memory_updated_at
+FROM chat_sessions
+ORDER BY updated_at DESC;
+```
+
+검증 시나리오:
+
+1. 한 chat session에서 보증금 반환, 특약, 수리비 관련 질문을 여러 번 보낸다.
+2. 이후 `그럼 내가 현실적으로 할 수 있는 일은?`처럼 짧은 후속 질문을 보낸다.
+3. `chat_sessions.memory_summary`가 갱신되는지 확인한다.
+4. 답변이 최근 8개 메시지 바깥으로 밀린 핵심 이슈도 참고하는지 확인한다.
+
+현재 한계:
+
+- 1차 구현은 OpenAI 요약이 아니라 rule-based keyword 요약이다.
+- API 응답 구조에는 memory summary를 노출하지 않는다.
+- 향후 `topic`, `answer_style`, `safety_level`, `top_issue_categories`를 구조화해 저장하면 더 안정적으로 개선할 수 있다.
