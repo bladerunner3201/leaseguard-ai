@@ -2,94 +2,59 @@
 
 ## 1. 프로젝트 개요
 
-**LeaseGuard AI**는 부동산 임대차계약서를 업로드하면 계약서의 주요 위험 요소를 점검하고, 법령·공공 체크리스트·curated reference 문서를 기반으로 질문에 답변하는 RAG 기반 AI 도우미이다.
+**LeaseGuard AI**는 부동산 임대차계약서를 업로드하면 계약서의 주요 위험요소를 점검하고, 법령·공공 체크리스트·curated reference 문서를 근거로 질문에 답변하는 RAG 기반 AI 도우미이다.
 
-본 프로젝트의 목적은 법률 전문가가 아닌 사용자가 임대차계약서의 핵심 조항을 이해하고, 임대인 또는 공인중개사에게 확인해야 할 질문을 정리하도록 돕는 데 있다. 특히 보증금 반환, 특약 조항, 수리비 부담, 전입신고와 확정일자, 등기부등본 확인, 전세사기 예방 체크리스트와 같은 항목을 중심으로 참고용 위험 점검을 제공한다.
+본 프로젝트는 법률 자문 서비스를 목표로 하지 않는다. 계약 체결 여부, 계약 무효 여부, 위법 여부, 소송 승패를 단정하지 않고, 제공된 계약서와 reference source를 바탕으로 확인이 필요한 위험요소를 안내한다. 사용자는 이를 통해 임대인 또는 공인중개사에게 확인할 질문을 정리하고, 필요 시 전문가 상담으로 이어갈 수 있다.
 
-본 서비스는 법률 자문 서비스가 아니다. 계약 체결 여부, 계약 무효 여부, 위법 여부, 소송 승패를 단정하지 않는다. 제공하는 답변은 계약서 조각과 reference source에 근거한 참고용 위험 점검이며, 최종 판단이 필요한 경우 전문가 상담을 권장한다.
+### 1.1 서비스 포지셔닝
 
-### 1.1 기획 배경
+본 서비스는 “부동산 계약서 법률 조언 챗봇”이 아니라 “임대차계약서 위험요소를 법령·공공 체크리스트·curated reference와 비교해 점검하는 RAG 기반 AI 도우미”이다. 따라서 답변은 다음 원칙을 따른다.
 
-임대차계약서는 일반 사용자가 이해하기 어려운 법률 용어와 실무 표현을 포함한다. 보증금 반환 시점, 임차인 수리비 부담 범위, 특약 조항, 전입신고와 확정일자, 등기부등본상 선순위 권리 등은 계약 이후 분쟁으로 이어질 수 있는 대표적 확인 항목이다.
-
-LeaseGuard AI는 사용자가 계약서를 업로드하면 계약서 원문에서 관련 문장을 발췌하고, ChromaDB에 저장된 reference 문서와 함께 검색한 뒤 OpenAI Chat API로 답변을 생성한다. 답변에는 sources를 함께 제공하여 사용자가 근거 문장을 확인할 수 있도록 했다.
+- 계약서 조각과 reference source에 근거해 설명한다.
+- sources에 없는 내용은 단정하지 않는다.
+- 법률 판단이 필요한 질문에는 단정 대신 확인 가능 사항과 전문가 상담 권장을 제시한다.
+- 모든 AI 답변은 “법률 자문이 아니라 참고용 위험 점검”이라는 한계를 유지한다.
 
 ### 1.2 MVP 범위
 
-현재 MVP는 비로그인 익명 세션 기반으로 동작한다. 회원가입, JWT 인증, 등기부등본 OCR 검증, 시세 API 연동, 보증보험 가입 가능성 자동 판단은 구현하지 않았다.
+현재 MVP는 로그인 없이 익명 세션 기반으로 동작한다. `anonymousSessionId`를 브라우저 `localStorage`에 저장하고, 모든 Spring Boot API 요청에 `X-Anonymous-Session-Id` 헤더를 포함한다.
 
-구현된 MVP 범위는 다음과 같다.
+구현된 MVP 기능은 다음과 같다.
 
-- 익명 세션 생성 및 `localStorage` 저장
+- 익명 세션 생성 및 브라우저 저장
 - TXT/PDF 계약서 업로드
 - 텍스트 추출 가능한 PDF 처리
 - 계약서 chunking 및 ChromaDB 저장
 - curated reference 문서 인덱싱
-- rule-based 계약서 위험 항목 분석
-- 계약서 원문 evidence 발췌
-- RAG 기반 계약서 Q&A
-- OpenAI Chat API 기반 답변 생성
-- response mode 기반 답변 전략 조정
-- 최근 대화 맥락 전달
-- 답변 sources 표시
-- 채팅 기록 및 source 저장
-- 이전 계약서 목록 조회, 분석 재진입, 채팅 복원
+- OpenAI embedding 기반 hybrid retrieval
+- rule-based 계약서 위험요소 분석 및 evidence 발췌
+- RAG + OpenAI Chat API 기반 계약서 Q&A
+- 구조화된 chat intent 기반 prompt routing
+- 구조화된 chat memory summary 기반 후속 질문 보조
+- 답변 본문 `[Source n]` citation과 source 토글 UI
+- 채팅 기록 및 message sources 저장
+- 이전 계약서 목록, 분석 결과, 채팅 복원
 - 계약서 soft delete
 - 브라우저 익명 세션 초기화
+- Sequential Multi-Agent 종합 검토 리포트 생성
+- 비동기 review job polling
+- 완료된 sequential multi-agent report의 MySQL 저장 및 새로고침 복원
+- Markdown, TXT, 브라우저 print 기반 PDF 다운로드
 
-## 2. 주요 기능
+## 2. 기술 스택
 
-| 기능 | 구현 내용 |
+| 영역 | 기술 |
 | --- | --- |
-| 익명 세션 | 로그인 없이 UUID 기반 `anonymousSessionId`를 생성하고 브라우저 `localStorage`에 저장한다. |
-| 계약서 업로드 | React에서 multipart 방식으로 TXT/PDF 파일을 업로드하고 Spring Boot가 파일을 저장한다. |
-| PDF 텍스트 추출 | FastAPI가 `pypdf`로 텍스트 추출 가능한 PDF를 처리한다. 스캔본 PDF는 OCR 미지원 오류를 반환한다. |
-| 계약서 인덱싱 | 계약서 텍스트를 chunk로 나누어 ChromaDB `user_contracts` collection에 저장한다. |
-| reference 인덱싱 | curated reference 문서와 manifest를 읽어 ChromaDB `legal_reference` collection에 저장한다. |
-| 위험 분석 | rule-based 분석으로 보증금 반환, 특약, 수리비, 계약 해지, 관리비 관련 항목을 점검한다. |
-| evidence 표시 | 위험 항목별로 계약서 원문에서 관련 문장 또는 주변 문맥을 발췌한다. |
-| RAG 검색 | 계약서 chunk와 reference chunk를 함께 검색하고 category 기반 reranking을 적용한다. |
-| OpenAI 답변 | 검색된 sources와 chatHistory를 바탕으로 OpenAI Chat API가 답변을 생성한다. |
-| response mode | 질문 의도에 따라 쉬운 설명, 비유, 임대인 질문 문장, 짧은 요약, 조항 수정 예시, 법률 판단 거절 전략을 적용한다. |
-| 채팅 복원 | 저장된 chat session과 message를 다시 불러와 이전 대화를 표시한다. |
-| Dashboard | 익명 세션 기준으로 이전 계약서 목록을 조회하고 분석 결과 또는 채팅 화면으로 재진입한다. |
-| 계약서 삭제 | Dashboard에서 계약서를 soft delete하고 목록에서 제외한다. |
+| Frontend | React, Vite, CSS |
+| Backend | Spring Boot, Java 17, Gradle, JPA |
+| RAG Server | FastAPI, Python, Pydantic |
+| Vector DB | ChromaDB |
+| Database | MySQL |
+| LLM | OpenAI Chat API |
+| Embedding | OpenAI Embedding, local hash fallback |
+| Infra | Docker, docker-compose |
 
-## 3. 화면 예시
-
-실제 스크린샷 파일은 `docs/screenshots/` 경로에 저장되어 있다.
-
-### 3.1 계약서 업로드 화면
-
-![계약서 업로드 화면](docs/screenshots/01-upload.png)
-
-계약서 TXT/PDF 파일을 선택하고 업로드한다. 업로드 후 Spring Boot가 FastAPI RAG 서버에 계약서 인덱싱과 분석을 요청한다.
-
-### 3.2 분석 결과 화면
-
-![분석 결과 화면](docs/screenshots/02-analysis.png)
-
-전체 위험도, 요약, 위험 항목, 설명, 계약서 원문 evidence를 표시한다. 사용자는 분석 결과에서 바로 채팅 화면으로 이동할 수 있다.
-
-### 3.3 RAG 채팅 화면
-
-![RAG 채팅 화면](docs/screenshots/03-chat.png)
-
-사용자 질문과 assistant 답변을 표시한다. assistant 답변은 줄바꿈을 유지하며, 계약서 근거와 reference 근거를 sources로 구분해 보여준다.
-
-### 3.4 Dashboard 화면
-
-![Dashboard 화면](docs/screenshots/04-dashboard.png)
-
-익명 세션 기준으로 업로드한 계약서 목록을 보여준다. 각 계약서에 대해 분석 결과 보기, 질문하기, 삭제 기능을 제공한다.
-
-### 3.5 response mode 예시 화면
-
-![response mode 예시 화면](docs/screenshots/05-response-modes.png)
-
-쉬운 설명, 비유, 임대인에게 물어볼 문장, 짧은 요약 등 사용자 질문 의도에 따라 답변 전략이 달라지는 모습을 확인할 수 있다.
-
-## 4. 시스템 아키텍처
+## 3. 시스템 아키텍처
 
 ```mermaid
 flowchart LR
@@ -98,25 +63,63 @@ flowchart LR
     Spring --> MySQL[("MySQL")]
     Spring --> FastAPI["FastAPI RAG Server"]
     FastAPI --> Chroma[("ChromaDB")]
-    FastAPI --> OpenAI["OpenAI Chat API"]
+    FastAPI --> OpenAI["OpenAI API"]
 ```
 
-### 4.1 구성 요소 역할
+React는 OpenAI API 또는 FastAPI를 직접 호출하지 않는다. 모든 사용자 요청은 `React → Spring Boot → FastAPI → OpenAI API` 흐름을 따른다. Spring Boot는 세션 검증, 계약서 메타데이터, 분석 결과, 채팅 기록, 리포트 저장을 담당한다. FastAPI는 문서 파싱, 인덱싱, 검색, rule-based 분석, LLM prompt 구성, sequential multi-agent review를 담당한다.
 
-| 구성 요소 | 역할 |
+## 4. 디렉터리 구조
+
+```text
+leaseguard-ai/
+├── frontend/                 # React frontend
+├── backend/                  # Spring Boot backend
+├── rag-server/               # FastAPI RAG server
+├── data/                     # 초기 샘플 및 reference 자료
+├── docs/                     # 화면 캡처 등 문서 자료
+├── docker-compose.yml
+├── .env.example
+├── TEST_COMMANDS.md
+├── TEST_RAG_SEARCH.md
+├── TEST_MULTI_AGENT.md
+├── TEST_CHAT_MEMORY.md
+├── TEST_CHAT_INTENT.md
+└── README.md
+```
+
+FastAPI reference 자료는 다음 경로를 사용한다.
+
+```text
+rag-server/data/reference_sources/
+├── curated/
+└── source_manifest.json
+```
+
+## 5. 주요 기능
+
+| 기능 | 구현 내용 |
 | --- | --- |
-| React Frontend | 계약서 업로드, 분석 결과, 채팅, Dashboard UI를 제공한다. |
-| Spring Boot Backend | 익명 세션, 계약서 메타데이터, 분석 결과, 채팅 세션, 메시지, sources를 MySQL에 저장한다. |
-| FastAPI RAG Server | 계약서 텍스트 추출, chunking, ChromaDB 인덱싱, RAG 검색, OpenAI 호출을 수행한다. |
-| ChromaDB | `legal_reference`와 `user_contracts` collection을 통해 reference 및 계약서 chunk를 저장·검색한다. |
-| MySQL | 익명 세션, 계약서, 분석 결과, 채팅 기록, message sources를 저장한다. |
-| OpenAI Chat API | 검색된 sources와 chatHistory를 바탕으로 자연어 답변을 생성한다. |
+| 익명 세션 | UUID 기반 `anonymousSessionId`를 생성하고 MySQL 및 브라우저 `localStorage`에 저장한다. |
+| 계약서 업로드 | React에서 multipart 방식으로 TXT/PDF 파일을 업로드한다. |
+| PDF 처리 | FastAPI가 `pypdf`를 사용해 텍스트 추출 가능한 PDF를 처리한다. 스캔본 PDF는 OCR 미지원 오류를 반환한다. |
+| 계약서 인덱싱 | 추출된 계약서 텍스트를 chunk로 나누고 `user_contracts` collection에 저장한다. |
+| reference 인덱싱 | curated reference 문서와 manifest metadata를 `legal_reference` collection에 저장한다. |
+| 위험 분석 | rule 기반으로 보증금 반환, 특약, 수리비, 계약 해지, 관리비 등 확인 항목을 분석한다. |
+| evidence 발췌 | 위험 항목과 관련된 계약서 원문 문장 또는 주변 문맥을 evidence로 제시한다. |
+| RAG Q&A | 계약서 chunk와 reference chunk를 함께 검색해 OpenAI 답변을 생성한다. |
+| hybrid retrieval | OpenAI embedding, local hash fallback, keyword coverage, metadata bonus, category reranking을 조합한다. |
+| source citation | 답변 본문에 `[Source n]`을 표시하고, React에서 해당 번호의 source만 토글로 제공한다. |
+| chat memory | 최근 메시지 8개만 전달하되, 긴 대화의 핵심 이슈를 구조화된 memory JSON으로 저장한다. |
+| intent routing | `topic`, `answerStyle`, `safetyLevel`, `isFollowUp`을 분리해 prompt와 retrieval query rewriting에 사용한다. |
+| Dashboard | 이전 계약서 목록, 분석 결과 재진입, 채팅 재진입, 삭제, 세션 초기화를 제공한다. |
+| Sequential Multi-Agent Report | Supervisor, Specialist, Risk Aggregator, Advisor & Report Agent를 순차적으로 실행해 종합 검토 리포트를 생성한다. |
+| Async Report Job | 리포트 생성을 job으로 시작하고 React가 progress를 polling한다. |
+| Report Persistence | 완료된 리포트를 MySQL에 저장해 새로고침 후에도 복원한다. |
+| Report Download | Markdown, TXT, 브라우저 print 기반 PDF 저장을 제공한다. |
 
-React는 OpenAI API 또는 FastAPI를 직접 호출하지 않는다. 모든 요청은 `React → Spring Boot → FastAPI → OpenAI API` 흐름을 따른다.
+## 6. 데이터 흐름
 
-## 5. 데이터 흐름
-
-### 5.1 계약서 업로드 및 분석 흐름
+### 6.1 계약서 업로드 및 분석
 
 ```mermaid
 sequenceDiagram
@@ -129,27 +132,19 @@ sequenceDiagram
 
     U->>R: TXT/PDF 계약서 업로드
     R->>S: POST /api/v1/contracts
-    S->>S: 파일 저장 및 contract 생성
+    S->>M: contract metadata 저장
     S->>F: POST /rag/contracts/index
     F->>F: TXT/PDF 텍스트 추출
     F->>F: chunking
     F->>C: user_contracts upsert
-    F->>F: rule-based 위험 분석 및 evidence 추출
-    F-->>S: 분석 결과 반환
-    S->>M: contract 및 analysis 저장
+    F->>F: rule-based risk analysis
+    F-->>S: analysis 반환
+    S->>M: analysis 저장
     S-->>R: contract, analysis 반환
     R-->>U: 분석 결과 표시
 ```
 
-### 5.2 reference 문서 인덱싱 흐름
-
-1. FastAPI가 `rag-server/data/reference_sources/curated` 문서를 읽는다.
-2. `source_manifest.json`을 로드해 category, sourceType, keywords 등 metadata를 구성한다.
-3. 문서를 글자 수 기반 chunk로 나눈다.
-4. 안정적인 id를 생성해 ChromaDB `legal_reference` collection에 upsert한다.
-5. 같은 문서를 다시 인덱싱해도 과도한 중복 저장이 발생하지 않도록 처리한다.
-
-### 5.3 채팅/RAG 답변 흐름
+### 6.2 RAG 채팅
 
 ```mermaid
 sequenceDiagram
@@ -161,40 +156,95 @@ sequenceDiagram
     participant O as OpenAI
     participant M as MySQL
 
-    U->>R: 계약서 관련 질문 입력
+    U->>R: 계약서 질문 입력
     R->>S: POST /api/v1/chat-sessions/{id}/messages
     S->>M: user message 저장
-    S->>F: POST /rag/chat + chatHistory
-    F->>F: response_mode 및 follow-up 감지
-    F->>F: 내부 retrieval query rewriting
+    S->>S: structured memory summary 갱신
+    S->>F: POST /rag/chat + recent history + memory
+    F->>F: intent 분석 및 query rewriting
     F->>C: user_contracts 검색
     F->>C: legal_reference 검색
-    F->>F: category reranking
-    F->>O: system prompt + chatHistory + sources + user question
-    O-->>F: assistant answer
+    F->>F: reranking 및 source mix 구성
+    F->>O: system prompt + history + sources
+    O-->>F: answer 생성
     F-->>S: answer, sources 반환
     S->>M: assistant message 및 sources 저장
     S-->>R: answer, sources 반환
-    R-->>U: 답변 및 근거 표시
+    R-->>U: 답변 및 cited sources 표시
 ```
 
-## 6. AI/RAG 구현 상세
+### 6.3 Sequential Multi-Agent Report
 
-### 6.1 RAG 적용 이유
+```mermaid
+sequenceDiagram
+    participant R as React
+    participant S as Spring Boot
+    participant F as FastAPI
+    participant A as Agents
+    participant M as MySQL
 
-본 프로젝트는 법령과 체크리스트를 모델에 직접 학습시키는 방식이 아니라, reference 문서를 ChromaDB에 저장하고 질문 시 관련 chunk를 검색하는 RAG 방식을 사용한다. 이 방식은 LLM 단독 답변보다 source 기반 설명을 제공하기 쉽고, 제공된 자료 밖의 내용을 단정하지 않도록 제어하기에 적합하다.
-
-### 6.2 reference dataset
-
-reference 문서는 curated txt 파일과 manifest로 구성한다.
-
-```text
-rag-server/data/reference_sources/
-├── curated/
-└── source_manifest.json
+    R->>S: POST /api/v1/contracts/{contractId}/review-jobs
+    S->>F: POST /rag/contracts/review-jobs
+    F-->>S: jobId, status 반환
+    S-->>R: jobId, status 반환
+    R->>S: GET /api/v1/contracts/{contractId}/review-jobs/{jobId}
+    S->>F: GET /rag/contracts/review-jobs/{jobId}
+    F->>A: Supervisor/Specialist/Aggregator/Report 실행
+    F-->>S: progress 또는 result 반환
+    S->>M: completed report 저장
+    S-->>R: savedReviewReport 반환
+    R-->>R: reportMarkdown 렌더링 및 다운로드 제공
 ```
 
-현재 reference 문서는 다음 주제를 포함한다.
+## 7. RAG 구현
+
+RAG는 Retrieval-Augmented Generation의 약어이다. 본 프로젝트에서는 “LLM이 기억하고 있는 일반 지식만으로 답하게 하는 방식”이 아니라, 먼저 계약서와 reference 문서에서 관련 문장을 검색한 뒤 그 검색 결과를 OpenAI에 함께 전달한다. 즉, 답변 생성 전에 근거 문장을 찾고, 그 근거 안에서만 답하도록 제한하는 구조이다.
+
+LeaseGuard AI에서 RAG가 필요한 이유는 다음과 같다.
+
+- 임대차계약서마다 문구와 특약이 다르므로, 사용자가 업로드한 계약서 원문을 직접 참조해야 한다.
+- 법률·체크리스트 기준은 계약서 밖의 reference 문서에 있으므로, 계약서 문구와 기준 문서를 함께 비교해야 한다.
+- 답변에 근거 source를 표시해야 하므로, 어떤 문장을 보고 답했는지 추적할 수 있어야 한다.
+- 법률 판단을 단정하지 않기 위해 sources에 없는 내용을 만들지 않도록 통제해야 한다.
+
+### 7.1 문서 가공 파이프라인
+
+계약서와 reference 문서는 그대로 LLM에 넣지 않는다. 문서 전체를 한 번에 넣으면 길이가 길고, 질문과 관련 없는 내용까지 섞이기 때문이다. 따라서 문서를 작은 조각으로 나누고, 각 조각에 metadata를 붙여 검색 가능한 형태로 저장한다.
+
+```mermaid
+flowchart TD
+    A["TXT/PDF 문서"] --> B["텍스트 추출"]
+    B --> C["문단 정리 및 chunk 분할"]
+    C --> D["metadata 부여"]
+    D --> E["embedding 생성"]
+    E --> F["ChromaDB 저장"]
+    F --> G["질문 시 관련 chunk 검색"]
+```
+
+각 단계의 의미는 다음과 같다.
+
+| 단계 | 설명 |
+| --- | --- |
+| 텍스트 추출 | TXT는 그대로 읽고, PDF는 `pypdf`로 텍스트를 추출한다. 스캔 PDF처럼 글자가 이미지로만 있는 경우 OCR이 필요하므로 현재 단계에서는 지원하지 않는다. |
+| chunk 분할 | 긴 문서를 500~800자 내외의 작은 조각으로 나눈다. 이렇게 하면 “보증금 반환” 질문에 계약서 전체가 아니라 관련 조항만 검색할 수 있다. |
+| metadata 부여 | 각 chunk에 문서 제목, sourceType, category, contractId, anonymousSessionId 같은 정보를 붙인다. 이 정보는 검색 필터링과 reranking에 사용한다. |
+| embedding 생성 | 문장을 숫자 벡터로 바꾼다. 의미가 비슷한 문장끼리 가까운 벡터가 되므로, 키워드가 완전히 같지 않아도 관련 문장을 찾을 수 있다. |
+| ChromaDB 저장 | chunk, metadata, embedding을 vector DB에 저장한다. 이후 질문이 들어오면 ChromaDB에서 관련 chunk를 빠르게 검색한다. |
+
+### 7.2 ChromaDB collection
+
+ChromaDB에는 두 종류의 collection을 둔다. collection은 비슷한 성격의 문서 조각을 담는 저장소라고 볼 수 있다.
+
+| Collection | 저장 대상 | 주요 metadata | 분리 이유 |
+| --- | --- | --- | --- |
+| `legal_reference` | 법령, guide, checklist, standard contract reference | `category`, `sourceType`, `title`, `fileName`, `chunkIndex`, `keywords` | 모든 사용자가 공통으로 참조하는 기준 문서를 저장한다. |
+| `user_contracts` | 사용자가 업로드한 계약서 chunk | `anonymousSessionId`, `contractId`, `documentName`, `chunkIndex` | 사용자별 계약서 원문을 저장한다. |
+
+`user_contracts` 검색은 반드시 `anonymousSessionId`와 `contractId` 기반 filter를 사용한다. 이는 보안과 데이터 격리를 위한 핵심 조건이다. 예를 들어 A 사용자가 업로드한 계약서가 B 사용자의 질문 답변에 섞이면 안 되므로, 계약서 chunk 검색 시 현재 세션과 현재 계약서에 해당하는 chunk만 조회한다.
+
+### 7.3 reference dataset과 metadata
+
+현재 curated reference는 임대차계약서 MVP에서 자주 등장하는 위험 주제를 중심으로 구성한다.
 
 - 보증금 반환
 - 특약 조항
@@ -204,141 +254,315 @@ rag-server/data/reference_sources/
 - 전세사기 예방 체크리스트
 - 표준계약서 기준 항목
 
-### 6.3 ChromaDB collection
+reference 문서에는 단순 텍스트만 저장하지 않고, 검색 품질을 위해 metadata를 함께 저장한다.
 
-| Collection | 저장 대상 | 주요 metadata |
+```json
+{
+  "sourceType": "checklist",
+  "category": "deposit_return",
+  "title": "보증금 반환 확인 체크리스트",
+  "fileName": "deposit_return_checklist.txt",
+  "chunkIndex": 2,
+  "keywords": "보증금, 반환, 계약 종료, 임차권등기명령"
+}
+```
+
+이 metadata는 사용자가 “내 돈 못 받는 거야?”처럼 직접적인 법률 용어를 쓰지 않은 질문을 하더라도, 보증금 반환과 관련된 reference를 더 잘 찾도록 돕는다.
+
+### 7.4 Hybrid retrieval
+
+Hybrid retrieval은 여러 검색 방식을 조합한다는 의미이다. 한 가지 방식만 쓰면 놓치는 문장이 생기기 쉽다. 예를 들어 “보증금”이라는 단어가 정확히 들어간 문장을 찾는 것은 키워드 검색이 잘하지만, “돈을 돌려받는 시점”처럼 표현이 바뀐 질문은 의미 기반 검색이 더 잘 찾을 수 있다.
+
+본 프로젝트의 검색은 다음 요소를 함께 사용한다.
+
+| 요소 | 역할 |
+| --- | --- |
+| OpenAI embedding vector search | 질문과 의미가 비슷한 계약서/reference chunk를 찾는다. |
+| local hash embedding fallback | OpenAI embedding 호출이 실패하거나 local 모드일 때 최소 검색 기능을 유지한다. |
+| query expansion | “돌려받”, “내 돈”, “반환” 같은 표현을 `deposit_return` 관련 검색어로 확장한다. |
+| category metadata reranking | 검색된 결과 중 질문 주제와 category가 맞는 source에 가산점을 준다. |
+| keyword coverage score | 질문에 들어 있는 핵심 단어가 문서 내용이나 metadata에 얼마나 포함되는지 반영한다. |
+| contract/reference source mix | 계약서 근거와 reference 근거가 함께 나오도록 구성한다. |
+| reference title diversity | 같은 reference 문서만 반복해서 나오지 않도록 source 제목을 분산한다. |
+
+검색 흐름은 다음과 같다.
+
+```mermaid
+flowchart TD
+    A["사용자 질문"] --> B["intent 분석"]
+    B --> C["retrieval query rewriting"]
+    C --> D["query expansion"]
+    D --> E["embedding 생성"]
+    E --> F["계약서 chunk 검색"]
+    E --> G["reference chunk 검색"]
+    F --> H["metadata/keyword reranking"]
+    G --> H
+    H --> I["contract source + reference source 구성"]
+    I --> J["OpenAI prompt context"]
+```
+
+OpenAI embedding은 `OPENAI_API_KEY`가 있고 `EMBEDDING_PROVIDER`가 `auto` 또는 `openai`일 때 사용한다. API 호출 실패 시 local hash embedding으로 fallback한다. 이 fallback은 품질은 낮을 수 있지만, 개발 환경에서 기능 흐름이 완전히 멈추지 않도록 하기 위한 장치이다.
+
+### 7.5 source 가공 방식
+
+검색 결과로 얻은 source는 사용자에게 그대로 모두 보여주지 않는다. 먼저 OpenAI prompt에는 번호가 붙은 sources 목록으로 전달한다.
+
+```text
+[Source 1]
+sourceType: contract
+sourceTitle: sample_contract.pdf
+chunkText: 계약 종료 후 보증금을 반환한다...
+
+[Source 2]
+sourceType: checklist
+sourceTitle: 보증금 반환 체크리스트
+chunkText: 계약 종료일과 보증금 반환 시점을 명확히 확인해야 한다...
+```
+
+OpenAI는 답변에서 근거가 필요한 문장 뒤에 `[Source 1]`처럼 source 번호를 붙인다. React는 답변 본문에 실제로 언급된 source 번호만 화면에 표시한다. 이 방식의 장점은 다음과 같다.
+
+- 답변과 무관한 source가 화면을 차지하지 않는다.
+- 사용자는 답변 문장과 근거 문서를 번호로 쉽게 연결할 수 있다.
+- source 본문이 길어도 기본 300자 preview만 보여주고, 필요할 때만 “더보기”로 펼칠 수 있다.
+- 계약서 근거와 reference 근거를 분리해, “계약서에 실제로 적힌 내용”과 “체크리스트나 법령 기준”을 구분할 수 있다.
+
+따라서 source는 내부적으로는 `answer` 생성에 쓰이는 근거이고, UI에서는 답변 본문에 citation으로 연결된 근거만 선택적으로 보여주는 자료이다.
+
+### 7.6 Prompt routing
+
+사용자의 질문은 항상 같은 형태가 아니다. “위험한 점 알려줘”는 분석 요청이고, “너무 어려운데 쉽게 말해줘”는 설명 방식 변경 요청이며, “이 계약 무효야?”는 법률 판단을 요구하는 민감한 질문이다. 따라서 FastAPI는 질문을 내부적으로 다음 네 가지 intent로 나눈다.
+
+| 필드 | 의미 | 예시 |
 | --- | --- | --- |
-| `legal_reference` | 법령, guide, checklist, 표준계약서 기준 문서 | `category`, `sourceType`, `title`, `fileName`, `chunkIndex`, `keywords` |
-| `user_contracts` | 사용자가 업로드한 계약서 chunk | `anonymousSessionId`, `contractId`, `documentName`, `chunkIndex` |
+| `topic` | 질문의 계약 이슈 영역 | `deposit_return`, `registry_check` |
+| `answerStyle` | 답변 방식과 톤 | `structured_analysis`, `brief_summary` |
+| `safetyLevel` | 법률 판단 민감도 | `normal`, `legal_judgment_sensitive` |
+| `isFollowUp` | 후속 질문 여부 | `true`, `false` |
 
-`user_contracts` 검색은 반드시 `anonymousSessionId`와 `contractId` 기반 filter를 사용한다. 다른 사용자의 계약서 chunk가 검색 결과에 섞이지 않도록 격리한다.
+이 intent는 사용자에게 노출하지 않는다. 내부적으로 retrieval query rewriting과 OpenAI prompt building에만 사용한다. 예를 들어 “임대인에게 뭐라고 물어보면 돼?”라는 질문은 `answerStyle=landlord_question`으로 처리되어, 사용자가 실제로 복사해 쓸 수 있는 질문 문장 중심의 답변을 생성한다.
 
-### 6.4 검색 품질 개선
+### 7.7 Chat memory
 
-현재 RAG 검색은 다음 방식을 사용한다.
+Spring Boot는 현재 chat session의 최근 메시지 8개를 FastAPI에 전달한다. 하지만 대화가 길어지면 8개 이전의 중요한 맥락이 사라질 수 있다. 이를 보완하기 위해 `chat_sessions.memory_summary`에 구조화된 memory JSON을 저장한다.
 
-- 글자 수 기반 chunking
-- 자체 hash/token n-gram 기반 embedding
-- query expansion
-- category metadata 기반 reranking
-- contract/reference source mix 유지
-- 테스트 질문 기반 검색 품질 점검
+```json
+{
+  "topic": "deposit_return_risk_check",
+  "issueCategories": ["deposit_return", "repair_cost_restoration"],
+  "latestUserConcern": "보증금 반환 시점과 수리비 부담 범위 확인",
+  "recommendedNextActions": ["임대인에게 반환 시점을 문서로 확인", "특약 문구 수정 요청"]
+}
+```
 
-OpenAI embedding은 현재 사용하지 않는다. LangChain도 현재 MVP에 사용하지 않는다.
+이 memory는 “그럼?”, “그 조항은?”, “임대인에게 뭐라고 말해?” 같은 후속 질문에서 검색어를 보강하는 데 사용한다. 예를 들어 직전 대화의 핵심이 보증금 반환이었다면, “그럼 내가 현실적으로 할 수 있는 일은?”이라는 짧은 질문도 내부 검색에서는 보증금 반환, 반환 지연, 특약 확인 같은 단어를 함께 사용한다.
 
-### 6.5 OpenAI 답변 생성
+단, memory JSON과 rewritten query는 사용자에게 직접 보여주지 않는다. 사용자는 원문 질문을 그대로 보며, 시스템 내부에서만 검색 품질을 보완한다.
 
-FastAPI는 ChromaDB 검색 결과를 sources로 구성하고 OpenAI Chat API에 전달한다. 기본 모델은 `gpt-4o-mini`이며, `OPENAI_MODEL` 환경변수로 변경할 수 있다.
+## 8. Sequential Multi-Agent Report
 
-OpenAI 호출 조건은 다음과 같다.
+Sequential Multi-Agent Report는 채팅 답변보다 더 넓은 범위로 계약서를 종합 검토하기 위한 기능이다. 채팅은 사용자의 한 질문에 답하는 기능이고, sequential multi-agent report는 계약서 전체를 여러 관점에서 나누어 점검한 뒤 하나의 리포트로 합치는 기능이다.
 
-- `OPENAI_API_KEY`가 있으면 OpenAI Chat API를 호출한다.
-- API key가 없거나 호출에 실패하면 template fallback 답변을 반환한다.
-- fallback 답변도 법률 자문이 아니라 참고용 위험 점검이라는 문구를 유지한다.
-- sources가 없으면 제공된 자료만으로는 확인하기 어렵다는 취지로 답한다.
+여기서 “Agent”는 실제 독립된 사람이 아니라, 하나의 검토 역할을 담당하는 소프트웨어 모듈을 의미한다. 예를 들어 Supervisor Agent는 어떤 항목을 검토할지 정하고, Specialist Review Agent는 보증금 반환이나 수리비처럼 특정 영역을 집중 검토한다. 현재 구현은 agent들이 자율적으로 토론하거나 병렬 협상하는 구조가 아니라, 정해진 순서에 따라 실행되는 순차형 파이프라인이다.
 
-### 6.6 LeaseGuard AI 페르소나
+### 8.1 전체 파이프라인
 
-LeaseGuard AI는 법률 전문가처럼 최종 판단을 단정하지 않는다. 사용자가 이해하기 어려운 조항을 쉬운 말로 설명하고, 임대인 또는 공인중개사에게 확인할 질문을 정리하도록 돕는다.
+Sequential Multi-Agent Report는 다음 순서로 동작한다.
 
-답변 원칙은 다음과 같다.
+```mermaid
+flowchart TD
+    A["React: 리포트 생성 버튼"] --> B["Spring Boot: 계약서 소유권 확인"]
+    B --> C["FastAPI: review job 생성"]
+    C --> D["Supervisor Agent: 검토 domain 선택"]
+    D --> E["Specialist Review Agent: domain별 검색 및 finding 생성"]
+    E --> F["Risk Aggregator Agent: 위험도 종합"]
+    F --> G["Advisor & Report Agent: 한국어 reportMarkdown 작성"]
+    G --> H["Spring Boot: 완료 리포트 MySQL 저장"]
+    H --> I["React: 리포트 표시 및 다운로드"]
+```
 
-- 계약서 조각과 reference source에 근거한다.
-- sources에 없는 내용은 단정하지 않는다.
-- 계약 무효, 위법, 소송 승패, 계약 체결 가능 여부를 단정하지 않는다.
-- 필요한 경우 전문가 상담을 권장한다.
-- 마지막에 법률 자문이 아니라 참고용 위험 점검이라는 취지를 포함한다.
+이 구조를 사용한 이유는 계약서 검토가 한 가지 기준으로 끝나지 않기 때문이다. 보증금 반환, 특약, 수리비, 전입신고, 등기부등본, 전세사기 예방은 서로 다른 확인 포인트를 갖는다. 하나의 큰 prompt로 모두 처리하면 항목이 누락되거나 설명이 흐려질 수 있으므로, domain별 검토 결과를 만든 뒤 최종 리포트로 합치는 방식을 사용한다.
 
-### 6.7 response mode 기반 프롬프트 라우팅
+### 8.2 Agent 구성
 
-`response_mode`는 고정 출력 템플릿이 아니라 답변 전략과 톤을 정하는 힌트로 사용한다.
+| Agent | 역할 | 산출물 |
+| --- | --- | --- |
+| Supervisor Agent | 검토할 domain 목록을 선택한다. | `selectedDomains` |
+| Specialist Review Agent | 각 domain별로 계약서 source와 reference source를 검색하고 finding을 만든다. | `category`, `riskLevel`, `contractEvidence`, `recommendations` |
+| Risk Aggregator Agent | domain별 findings를 종합해 전체 위험도와 핵심 위험을 정리한다. | `overallRiskLevel`, `summary`, `topRisks` |
+| Advisor & Report Agent | 사용자가 읽을 수 있는 한국어 리포트 본문을 작성한다. | `reportMarkdown` |
 
-| response_mode | 목적 |
+검토 domain은 다음과 같다.
+
+| Domain | 확인하는 내용 |
 | --- | --- |
-| `structured_analysis` | 기본 위험 분석 답변 |
-| `easy_explanation` | 쉬운 설명 |
-| `analogy` | 비유 또는 예시 중심 설명 |
-| `landlord_question` | 임대인에게 물어볼 문장 제안 |
-| `brief_summary` | 짧은 핵심 요약 |
-| `rewrite_clause` | 조항 수정 방향 및 참고용 예시 문구 |
-| `legal_judgment_refusal` | 최종 법률 판단 단정 회피 및 확인사항 안내 |
+| `deposit_return` | 보증금 반환 시점, 반환 조건, 반환 지연 가능성 |
+| `special_clause` | 임차인에게 불리하거나 과도한 특약 |
+| `repair_cost` | 수리비, 수선 의무, 원상복구 부담 범위 |
+| `move_in_fixed_date` | 전입신고, 확정일자, 대항력, 우선변제권 |
+| `registry_check` | 등기부등본, 근저당, 압류, 선순위 권리 |
+| `jeonse_fraud_prevention` | 전세사기 예방 체크리스트, 보증보험, 시세 확인 |
+| `standard_contract` | 표준계약서 기준 필수 항목과 누락 가능성 |
 
-### 6.8 대화 맥락 유지
+### 8.3 Specialist Review의 source 가공
 
-Spring Boot는 최근 메시지 일부를 `chatHistory`로 FastAPI에 전달한다. FastAPI는 이를 OpenAI messages에 포함해 “그 부분”, “방금 말한 조항”, “그럼 어떻게 해야 해” 같은 후속 질문을 이전 대화 흐름에 맞게 해석한다.
+Specialist Review Agent는 domain별로 정해진 검색 query를 사용한다. 예를 들어 `deposit_return` domain은 보증금 반환, 계약 종료, 반환 지연, 임차권등기명령과 관련된 검색어를 사용한다.
 
-또한 FastAPI는 내부 retrieval query rewriting을 수행한다. 이 과정은 사용자에게 보이는 원문 질문을 바꾸지 않고, ChromaDB 검색과 OpenAI prompt 구성을 위해 내부적으로만 사용한다.
+각 domain 검토는 다음 과정을 따른다.
 
-## 7. Backend 구현 상세
+1. domain별 query를 만든다.
+2. `user_contracts`에서 현재 계약서의 관련 chunk를 검색한다.
+3. `legal_reference`에서 같은 domain의 reference chunk를 검색한다.
+4. 계약서 chunk가 있으면 그중 가장 관련 높은 문장을 `contractEvidence`로 사용한다.
+5. reference chunk는 `relatedSources`로 연결한다.
+6. domain별 rule에 따라 `LOW`, `CAUTION`, `HIGH` 중 하나의 위험도를 부여한다.
+7. 사용자가 확인해야 할 질문이나 행동을 `recommendations`로 정리한다.
 
-Backend는 Spring Boot 기반 API 서버이다. React와 FastAPI 사이의 중간 계층 역할을 수행하며, 데이터 영속화와 사용자 요청 검증을 담당한다.
+예를 들어 보증금 반환 domain의 finding은 다음과 같은 구조가 된다.
 
-### 7.1 패키지 역할
+```json
+{
+  "category": "deposit_return",
+  "riskLevel": "CAUTION",
+  "title": "보증금 반환 조건 확인 필요",
+  "contractEvidence": "계약 종료 후 보증금을 반환한다.",
+  "reason": "반환 시점이 구체적이지 않으면 분쟁 가능성이 있다.",
+  "recommendations": [
+    "계약 종료일에 반환되는지 확인한다.",
+    "신규 임차인 입주 조건이 붙어 있는지 확인한다."
+  ]
+}
+```
 
-| 패키지 | 역할 |
+이 결과는 최종 사용자에게 그대로 노출되기보다, Risk Aggregator와 Advisor & Report Agent가 읽기 쉬운 리포트로 다시 정리한다.
+
+### 8.4 Risk Aggregator와 최종 리포트
+
+Risk Aggregator Agent는 domain별 finding을 모아 전체 위험도를 정한다. 현재 MVP에서는 전문적인 법률 판단이 아니라, 검색된 계약서 조항과 reference 근거의 존재 여부, domain별 rule 결과를 바탕으로 `SAFE`, `CAUTION`, `DANGER` 또는 이에 준하는 위험 수준을 구성한다.
+
+Advisor & Report Agent는 종합 결과를 한국어 Markdown 리포트로 작성한다. 이때 다음 원칙을 유지한다.
+
+- 사용자가 처음 계약서를 읽는 사람이라고 가정한다.
+- 어려운 표현은 쉬운 말로 풀어 설명한다.
+- 계약서에서 확인된 내용과 reference 기준을 구분한다.
+- “위험하다”로 단정하기보다 “확인이 필요하다”는 방식으로 표현한다.
+- 최종 법률 판단이 필요한 경우 전문가 상담을 권장한다.
+
+### 8.5 Async job 구조
+
+Sequential Multi-Agent Report는 일반 채팅보다 시간이 더 걸릴 수 있다. 여러 domain을 검색하고, findings를 종합하고, 리포트 본문을 작성하기 때문이다. 따라서 사용자가 버튼을 누른 즉시 최종 결과를 기다리게 하지 않고, job을 생성한 뒤 진행률을 조회하는 구조를 사용한다.
+
+FastAPI는 `/rag/contracts/review-jobs`로 review job을 시작하고, `/rag/contracts/review-jobs/{jobId}`로 상태를 조회한다. Spring Boot는 이를 `/api/v1/contracts/{contractId}/review-jobs`와 `/api/v1/contracts/{contractId}/review-jobs/{jobId}`로 중계한다.
+
+상태값은 다음과 같다.
+
+| 상태 | 의미 |
 | --- | --- |
-| `anonymous` | 익명 세션 생성 및 조회 |
-| `contract` | 계약서 업로드, 목록 조회, 상세 조회, 분석 결과 조회, soft delete |
-| `chat` | 채팅 세션 생성, 메시지 저장, sources 저장, chatHistory 전달 |
-| `rag` | FastAPI RAG 서버 호출 client 및 DTO |
-| `global` | 공통 응답, 예외 처리, 설정 |
+| `PENDING` | job이 생성되었고 실행을 준비 중이다. |
+| `RUNNING` | agent 검토와 리포트 생성이 진행 중이다. |
+| `COMPLETED` | 리포트 생성이 완료되었다. |
+| `FAILED` | 계약서 chunk 없음, ChromaDB 오류, 처리 실패 등으로 job이 실패했다. |
 
-### 7.2 주요 API
+진행률은 대략 다음 기준으로 갱신한다.
+
+| progress | 의미 |
+| --- | --- |
+| 10 | job 시작 |
+| 25 | Supervisor 단계 완료 |
+| 50 | Specialist Review 단계 완료 |
+| 75 | Risk Aggregation 단계 완료 |
+| 90 | Report 작성 중 |
+| 100 | 완료 |
+
+React는 이 progress 값을 polling해 “분석 준비 중”, “전문 에이전트 검토 중”, “위험도 종합 중”, “리포트 작성 중”, “완료”와 같은 문구로 보여준다.
+
+### 8.6 저장과 복원
+
+초기 FastAPI job store는 in-memory로 동작할 수 있으므로 서버 재시작 시 job 자체는 사라질 수 있다. 이를 보완하기 위해 Spring Boot는 완료된 리포트를 MySQL `contract_review_reports` 테이블에 저장한다.
+
+저장되는 주요 정보는 다음과 같다.
+
+- `jobId`
+- `status`
+- `overallRiskLevel`
+- `summary`
+- `reportMarkdown`
+- `agentResultsJson`
+- `sourcesJson`
+- `createdAt`
+- `updatedAt`
+
+사용자가 분석 결과 화면을 새로고침하면 React는 `/api/v1/contracts/{contractId}/review-report`를 호출해 저장된 최신 리포트를 다시 불러온다. 따라서 job store가 사라져도 이미 완료되어 DB에 저장된 리포트는 복원할 수 있다.
+
+### 8.7 Report UI
+
+분석 결과 화면은 다음 요소를 제공한다.
+
+- 전체 위험도
+- summary
+- 접기/펼치기 가능한 reportMarkdown 본문
+- agent trace 접이식 영역
+- sources 접이식 영역
+- Markdown 다운로드
+- TXT 다운로드
+- 브라우저 print 기반 PDF 저장
+
+리포트 본문은 길어질 수 있으므로 기본 화면에서는 요약과 위험도를 먼저 보여주고, 본문은 접기/펼치기 형태로 제공한다. sources도 기본 접힘 상태로 두어, 사용자가 필요할 때 근거 문장을 확인하도록 한다.
+
+## 9. Backend API
+
+공통 요청 헤더는 다음과 같다.
+
+```http
+X-Anonymous-Session-Id: {anonymousSessionId}
+```
 
 | Method | Endpoint | 설명 |
 | --- | --- | --- |
-| POST | `/api/v1/anonymous-sessions` | 익명 세션 생성 |
-| POST | `/api/v1/contracts` | 계약서 업로드 및 분석 |
-| GET | `/api/v1/contracts` | 계약서 목록 조회 |
-| GET | `/api/v1/contracts/{contractId}` | 계약서 상세 조회 |
-| GET | `/api/v1/contracts/{contractId}/analysis` | 분석 결과 조회 |
-| DELETE | `/api/v1/contracts/{contractId}` | 계약서 soft delete |
-| POST | `/api/v1/chat-sessions` | 채팅 세션 생성 |
-| GET | `/api/v1/chat-sessions` | 채팅 세션 목록 조회 |
-| GET | `/api/v1/chat-sessions/{chatSessionId}/messages` | 메시지 목록 조회 |
-| POST | `/api/v1/chat-sessions/{chatSessionId}/messages` | 메시지 전송 및 RAG 답변 생성 |
+| POST | `/api/v1/anonymous-sessions` | 익명 세션을 생성한다. |
+| POST | `/api/v1/contracts` | 계약서를 업로드하고 분석한다. |
+| GET | `/api/v1/contracts` | 현재 익명 세션의 계약서 목록을 조회한다. |
+| GET | `/api/v1/contracts/{contractId}` | 계약서 상세 정보를 조회한다. |
+| GET | `/api/v1/contracts/{contractId}/analysis` | 계약서 분석 결과를 조회한다. |
+| DELETE | `/api/v1/contracts/{contractId}` | 계약서를 soft delete한다. |
+| POST | `/api/v1/contracts/{contractId}/review-jobs` | sequential multi-agent review job을 시작한다. |
+| GET | `/api/v1/contracts/{contractId}/review-jobs/{jobId}` | review job 상태와 결과를 조회한다. |
+| GET | `/api/v1/contracts/{contractId}/review-report` | 저장된 최신 종합 리포트를 조회한다. |
+| POST | `/api/v1/chat-sessions` | 채팅 세션을 생성한다. |
+| GET | `/api/v1/chat-sessions` | 채팅 세션 목록을 조회한다. |
+| GET | `/api/v1/chat-sessions/{chatSessionId}/messages` | 저장된 메시지 목록을 조회한다. |
+| POST | `/api/v1/chat-sessions/{chatSessionId}/messages` | 사용자 메시지를 저장하고 RAG 답변을 생성한다. |
 
-## 8. FastAPI RAG Server 구현 상세
-
-FastAPI는 계약서 분석과 RAG 검색을 담당한다.
+## 10. FastAPI API
 
 | Method | Endpoint | 설명 |
 | --- | --- | --- |
-| GET | `/health` | RAG 서버 상태 확인 |
-| POST | `/rag/references/index` | reference 문서 인덱싱 |
-| POST | `/rag/contracts/index` | 계약서 인덱싱 및 rule-based 분석 |
-| POST | `/rag/chat` | RAG 검색 및 OpenAI 답변 생성 |
+| GET | `/health` | RAG 서버 상태를 확인한다. |
+| POST | `/rag/references/index` | curated reference 문서를 인덱싱한다. |
+| POST | `/rag/contracts/index` | 계약서를 인덱싱하고 rule-based 분석을 수행한다. |
+| POST | `/rag/chat` | RAG 검색과 OpenAI 답변 생성을 수행한다. |
+| POST | `/rag/contracts/review` | 동기 sequential multi-agent report를 생성한다. |
+| POST | `/rag/contracts/review-jobs` | 비동기 sequential multi-agent review job을 시작한다. |
+| GET | `/rag/contracts/review-jobs/{jobId}` | 비동기 review job 상태와 결과를 조회한다. |
 
-### 8.1 주요 서비스 파일
+## 11. Database
 
-| 파일 | 역할 |
+주요 테이블은 다음과 같다.
+
+| 테이블 | 역할 |
 | --- | --- |
-| `contract_parser.py` | TXT/PDF 텍스트 추출 |
-| `chunking_service.py` | 문서 chunking |
-| `reference_indexing_service.py` | reference 문서 인덱싱 |
-| `contract_indexing_service.py` | 계약서 인덱싱 |
-| `retrieval_service.py` | ChromaDB 검색, query expansion, reranking |
-| `llm_service.py` | OpenAI 호출, response mode, fallback, prompt 구성 |
-| `risk_analysis_service.py` | rule-based 위험 항목 분석 및 evidence 추출 |
-| `chroma_client.py` | ChromaDB client 및 collection 관리 |
+| `anonymous_sessions` | 익명 세션 정보를 저장한다. |
+| `contracts` | 계약서 메타데이터와 상태를 저장한다. |
+| `contract_analysis_results` | rule-based 분석 결과를 저장한다. |
+| `chat_sessions` | 채팅 세션과 structured memory summary를 저장한다. |
+| `chat_messages` | 사용자 및 assistant 메시지를 저장한다. |
+| `message_sources` | assistant 답변에 연결된 sources를 저장한다. |
+| `contract_review_reports` | 완료된 sequential multi-agent 종합 리포트를 저장한다. |
 
-## 9. Frontend 구현 상세
+개발 환경에서는 JPA `ddl-auto=update`를 사용해 필요한 테이블 변경을 반영한다.
 
-Frontend는 React와 Vite 기반으로 구현했다. 최소 디자인을 적용하되 기능 검증이 가능하도록 화면을 구성했다.
+## 12. 실행 방법
 
-| 화면 | 기능 |
-| --- | --- |
-| Home | 서비스 소개 및 업로드 시작 |
-| ContractUpload | TXT/PDF 계약서 업로드 및 분석 요청 |
-| Analysis | 위험도, 요약, risk items, evidence 표시 |
-| Chat | 채팅 메시지, assistant 답변, sources 표시 |
-| Dashboard | 이전 계약서 목록, 분석 재진입, 채팅 재진입, 삭제, 세션 초기화 |
-
-Frontend는 `anonymousSessionId`를 `localStorage`에 저장하고 모든 API 요청에 `X-Anonymous-Session-Id` header를 포함한다.
-
-## 10. 실행 방법
-
-### 10.1 사전 요구사항
+### 12.1 사전 요구사항
 
 - Java 17
 - Node.js 및 npm
@@ -346,9 +570,9 @@ Frontend는 `anonymousSessionId`를 `localStorage`에 저장하고 모든 API �
 - Docker Desktop
 - OpenAI API key
 
-### 10.2 환경 변수
+### 12.2 환경 변수
 
-루트의 `.env.example`을 참고해 `.env`를 구성한다.
+루트의 `.env.example`을 참고해 `.env` 또는 각 실행 환경 변수를 구성한다.
 
 ```env
 # MySQL
@@ -366,30 +590,24 @@ RAG_SERVER_BASE_URL=http://localhost:8000
 # FastAPI
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4o-mini
+EMBEDDING_PROVIDER=auto
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_EMBEDDING_DIMENSIONS=128
 CHROMA_HOST=localhost
 CHROMA_PORT=8001
 ```
 
-실제 `.env` 파일은 Git에 포함하지 않는다. OpenAI API key는 frontend에 노출하지 않는다.
+OpenAI API key는 frontend에 노출하지 않는다.
 
-### 10.3 MySQL 및 ChromaDB 실행
+### 12.3 MySQL 및 ChromaDB 실행
 
 ```powershell
 docker compose up -d mysql chromadb
 ```
 
-MySQL은 host `localhost`, port `3306`을 사용한다. ChromaDB는 host `localhost`, port `8001`을 사용한다.
+MySQL은 `localhost:3306`, ChromaDB는 `localhost:8001`을 사용한다.
 
-### 10.4 Backend 실행
-
-```powershell
-cd backend
-.\gradlew.bat bootRun
-```
-
-Backend 기본 port는 `8080`이다.
-
-### 10.5 FastAPI 실행
+### 12.4 FastAPI 실행
 
 ```powershell
 cd rag-server
@@ -398,9 +616,16 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-FastAPI 기본 port는 `8000`이다.
+### 12.5 Backend 실행
 
-### 10.6 Frontend 실행
+```powershell
+cd backend
+.\gradlew.bat bootRun
+```
+
+Backend 기본 포트는 `8080`이다.
+
+### 12.6 Frontend 실행
 
 ```powershell
 cd frontend
@@ -408,110 +633,89 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Frontend 기본 port는 `5173`이다. PowerShell에서 실행 문제가 있으면 `npm` 대신 `npm.cmd`를 사용한다.
+Frontend 기본 포트는 `5173`이다. PowerShell에서는 `npm` 대신 `npm.cmd` 사용을 권장한다.
 
-## 11. 테스트 시나리오
+### 12.7 reference 인덱싱
 
-### 11.1 계약서 업로드 및 분석
+FastAPI 실행 후 다음 API를 호출해 reference 문서를 인덱싱한다.
 
-1. 익명 세션을 생성한다.
-2. TXT 또는 텍스트 추출 가능한 PDF 계약서를 업로드한다.
-3. Spring Boot가 FastAPI `/rag/contracts/index`를 호출한다.
-4. FastAPI가 계약서 텍스트를 추출하고 ChromaDB에 저장한다.
-5. rule-based 분석 결과와 evidence를 반환한다.
-6. React가 분석 결과 화면에 risk items를 표시한다.
+```powershell
+Invoke-RestMethod -Method Post -Uri "http://localhost:8000/rag/references/index"
+```
 
-### 11.2 RAG 채팅
+## 13. 테스트 문서
 
-예시 질문은 다음과 같다.
+| 문서 | 내용 |
+| --- | --- |
+| `TEST_COMMANDS.md` | PowerShell 기반 주요 API 테스트 명령을 정리한다. |
+| `TEST_RAG_SEARCH.md` | RAG 검색 회귀 테스트와 Hit@3, Noise count, source mix 기준을 정리한다. |
+| `TEST_MULTI_AGENT.md` | sequential multi-agent report 및 async job 테스트를 정리한다. |
+| `TEST_CHAT_MEMORY.md` | structured chat memory summary 테스트를 정리한다. |
+| `TEST_CHAT_INTENT.md` | structured chat intent routing 테스트를 정리한다. |
 
-- 이 계약에서 가장 위험한 점은?
-- 보증금 반환 조건이 위험한지 봐줘
-- 특약 조항 중 임차인에게 불리한 부분이 있어?
-- 전입신고와 확정일자는 왜 필요해?
-- 등기부등본에서 무엇을 확인해야 해?
-
-### 11.3 후속 질문
-
-예시 질문 흐름은 다음과 같다.
-
-1. 이 계약에서 가장 위험한 점은?
-2. 그럼 내가 현실적으로 할 수 있는 일은?
-3. 방금 말한 조항을 임대인에게 어떻게 물어봐야 해?
-4. 그 조항을 어떻게 고치면 좋을까?
-
-### 11.4 response mode
-
-예시 질문은 다음과 같다.
-
-- 너무 어려운데 쉽게 설명해 줘
-- 비유를 통해 설명해 줘
-- 임대인에게 뭐라고 물어보면 돼?
-- 짧게 핵심만 말해 줘
-- 이 조항을 어떻게 고치면 좋을까?
-- 이 계약 무효야? 소송하면 이겨?
-
-## 12. 검증 결과
+## 14. 검증 항목
 
 개발 과정에서 다음 항목을 검증했다.
 
 | 검증 항목 | 결과 |
 | --- | --- |
-| Spring Boot compile | 성공 |
-| React build | 성공 |
-| FastAPI compileall | 성공 |
+| Spring Boot `compileJava` | 성공 |
+| React `npm.cmd run build` | 성공 |
+| FastAPI `python -m compileall app` | 성공 |
 | FastAPI app import | 성공 |
 | `/rag/references/index` | 성공 |
 | `/rag/contracts/index` | 성공 |
 | `/rag/chat` fallback | 성공 |
 | `/rag/chat` OpenAI 호출 | 성공 |
-| 계약서 삭제 후 목록 제외 | 성공 |
-| 삭제된 계약서 분석·채팅 진입 차단 | 성공 |
-| 세션 초기화 후 새 익명 세션 생성 | 성공 |
+| OpenAI embedding reindex | 성공 |
+| 22개 RAG 검색 회귀 테스트 | 성공 |
+| 계약서 soft delete 후 목록 제외 | 성공 |
+| 삭제된 계약서 접근 차단 | 성공 |
+| sequential multi-agent review job 생성 및 polling | 성공 |
+| completed report DB 저장 및 복원 | 성공 |
+| report Markdown/TXT/PDF 다운로드 | 성공 |
 
-세부 API 테스트 명령은 `TEST_COMMANDS.md`와 `TEST_RAG_SEARCH.md`에 정리했다.
-
-## 13. 트러블슈팅
+## 15. 트러블슈팅
 
 | 문제 | 원인 및 해결 |
 | --- | --- |
 | PowerShell에서 `curl` 동작이 예상과 다름 | PowerShell alias 문제이므로 `curl.exe` 또는 `Invoke-RestMethod`를 사용한다. |
-| PowerShell 5에서 한글이 `?`로 표시됨 | 콘솔 입출력 인코딩 문제이다. React와 API JSON은 UTF-8 기준으로 정상 처리한다. |
+| PowerShell 5에서 한글이 `?`로 표시됨 | 콘솔 입출력 인코딩 문제이다. API JSON과 React 화면은 UTF-8 기준으로 처리한다. |
 | `vite` command not found | `frontend`에서 `npm.cmd install`을 먼저 실행한다. |
 | npm 실행 정책 문제 | PowerShell에서는 `npm.cmd`를 사용한다. |
 | port `8080` already in use | 기존 Spring Boot 프로세스를 종료하거나 port를 변경한다. |
 | ChromaDB telemetry warning | 기능 동작에는 영향이 없는 경고이다. |
 | `message_sources.source_type` 길이 초과 | DB column 길이를 확장하고 FastAPI `sourceType`을 정규화했다. |
-| 스캔 PDF 업로드 실패 | OCR을 구현하지 않았으므로 텍스트 추출 가능한 PDF만 지원한다. |
-| OpenAI API 호출 실패 | `OPENAI_API_KEY`, billing 상태, network 접근 가능 여부를 확인한다. |
+| 스캔 PDF 업로드 실패 | OCR은 현재 구현하지 않았으므로 텍스트 추출 가능한 PDF만 지원한다. |
+| OpenAI API 호출 실패 | `OPENAI_API_KEY`, billing, network 접근 가능 여부를 확인한다. 실패 시 fallback 답변을 사용한다. |
+| embedding provider 혼동 | `EMBEDDING_PROVIDER=auto`는 OpenAI key가 있으면 OpenAI embedding을 사용하고 실패 시 local hash로 fallback한다. |
 
-## 14. 현재 한계
+## 16. 현재 한계
 
-- 스캔 PDF와 이미지 OCR은 지원하지 않는다.
-- OpenAI embedding은 사용하지 않는다.
-- reference 문서 범위는 MVP 검증용 curated dataset 중심이다.
-- 익명 세션은 브라우저 `localStorage` 기반이므로 브라우저 변경 시 기존 목록에 접근하기 어렵다.
-- 실제 서비스 배포, 인증, rate limit, 보안 hardening은 구현하지 않았다.
-- 등기부등본 자동 검증, 시세 비교, 보증보험 가능성 판단은 구현하지 않았다.
+- 스캔 PDF 및 이미지 파일 OCR은 지원하지 않는다.
+- reference 문서는 MVP 검증용 curated dataset 중심이다.
+- 실제 등기부등본 OCR 분석, 시세 API, 보증보험 가입 가능성 자동 판단은 구현하지 않았다.
+- 익명 세션은 브라우저 `localStorage` 기반이므로 브라우저 변경 시 기존 목록 접근이 어렵다.
+- 실제 서비스 배포, 인증, rate limit, 운영 보안 hardening은 구현 범위 밖이다.
+- sequential multi-agent domain review는 rule과 retrieval 기반 1차 구조이며, 법률 전문가 검토를 대체하지 않는다.
 
-## 15. 향후 발전 방향
+## 17. 향후 발전 방향
 
 - OCR 기반 스캔 PDF 및 이미지 계약서 처리
-- OpenAI embedding 또는 한국어 sentence-transformers 기반 semantic embedding 도입 검토
-- 법령 조문 단위 reference 보강
-- source citation UI 개선
-- 계약서 조항별 clauseType 자동 분류
-- 위험도 스코어링 고도화
+- 등기부등본 OCR 분석 및 권리관계 자동 점검
+- 주소 기반 시세 및 실거래가 비교
+- 보증보험 가입 가능성 확인 보조
+- reference 문서 확장 및 최신 법령 source 관리
+- 위험도 scoring 고도화
+- clauseType 자동 분류 고도화
 - 사용자 계정 기반 문서 관리
 - 배포 환경 구성 및 보안 강화
-- 등기부등본 OCR 분석
-- 주소 기반 시세 및 실거래가 비교
 - 변호사 또는 공인중개사 상담 연계
 
-## 16. 회고
+## 18. 결론
 
-본 프로젝트를 통해 단순 LLM 호출보다 RAG 검색 품질과 metadata 설계가 답변 품질에 큰 영향을 준다는 점을 확인했다. reference 문서를 어떻게 chunking하고 어떤 category와 keywords를 부여하는지가 검색 결과와 source 품질을 좌우했다.
+본 프로젝트는 임대차계약서 위험 점검 문제를 RAG 검색, OpenAI 답변 생성, Spring Boot 기반 데이터 저장, React UI로 연결한 MVP이다. 특히 계약서 chunk와 curated reference를 분리 저장하고, 계약서 검색에는 익명 세션과 계약서 ID filter를 적용해 사용자 간 데이터 혼입을 방지했다.
 
-또한 법률 도메인에서는 단정적인 답변보다 안전한 페르소나와 출처 기반 설명이 중요하다. LeaseGuard AI는 최종 법률 판단을 제공하지 않고, 사용자가 계약서에서 확인해야 할 위험 요소와 질문을 정리하도록 돕는 방향으로 설계했다.
+또한 단순 Q&A를 넘어 structured chat memory, structured intent routing, cited source UI, Sequential Multi-Agent Report를 구현했다. 이를 통해 사용자는 계약서의 위험요소를 질문하고, 근거 source를 확인하며, 종합 검토 리포트를 저장·공유할 수 있다.
 
-Spring Boot와 FastAPI를 분리한 구조는 일반 서비스 로직과 AI/RAG 로직을 분리하는 데 효과적이었다. React에서는 업로드, 분석, 채팅, 대시보드 흐름을 구성하면서 실제 사용성에는 대화 복원, 이전 계약서 재진입, 삭제, 세션 초기화 같은 UX 기능도 중요하다는 점을 확인했다.
+다만 본 시스템은 법률 자문을 제공하지 않는다. LeaseGuard AI는 계약서에서 확인이 필요한 위험요소와 질문을 정리하는 참고용 도구이며, 최종 판단이 필요한 경우 전문가 상담이 필요하다.

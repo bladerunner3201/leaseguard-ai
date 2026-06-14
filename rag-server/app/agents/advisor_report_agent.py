@@ -75,7 +75,7 @@ def _user_prompt(aggregated_risk: AggregatedRiskResult, document_name: str | Non
 
 def _template_report(aggregated_risk: AggregatedRiskResult, document_name: str | None) -> str:
     lines = [
-        "# 멀티에이전트 계약서 종합 검토 리포트",
+        "# 순차형 멀티에이전트 계약서 종합 검토 리포트",
         "",
         "## 1. 종합 요약",
         f"- 문서명: {document_name or '알 수 없음'}",

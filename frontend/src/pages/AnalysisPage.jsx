@@ -60,7 +60,7 @@ function downloadTextFile(filename, content, mimeType) {
 function buildReportDownloadContent({ contract, result, format }) {
   const generatedAt = new Date().toLocaleString('ko-KR');
   const header = [
-    '# LeaseGuard AI 멀티에이전트 종합 검토 리포트',
+    '# LeaseGuard AI Sequential Multi-Agent 종합 검토 리포트',
     '',
     `- 생성일시: ${generatedAt}`,
     `- 계약서 파일명: ${contract?.originalFileName || '알 수 없음'}`,
@@ -449,7 +449,7 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
       <section className="panel stack multi-agent-panel">
         <div className="section-title no-print">
           <div>
-            <h2>Hybrid Multi-Agent Report</h2>
+            <h2>Sequential Multi-Agent Report</h2>
             <p className="muted">저장된 최신 리포트를 우선 표시하고, 새 리포트 생성이 완료되면 최신 결과로 갱신합니다.</p>
           </div>
           <button

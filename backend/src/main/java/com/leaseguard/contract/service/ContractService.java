@@ -191,7 +191,7 @@ public class ContractService {
         Contract contract = findOwnedContract(anonymousSessionId, contractId);
         return reviewReportRepository.findFirstByContractContractIdOrderByUpdatedAtDesc(contract.getContractId())
                 .map(this::toReviewReportResponse)
-                .orElseThrow(() -> new NotFoundException("저장된 멀티에이전트 리포트가 없습니다."));
+                .orElseThrow(() -> new NotFoundException("저장된 순차형 멀티에이전트 리포트가 없습니다."));
     }
 
     @Transactional(readOnly = true)
@@ -319,7 +319,7 @@ public class ContractService {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("멀티에이전트 리포트 JSON 저장에 실패했습니다.", exception);
+            throw new IllegalStateException("순차형 멀티에이전트 리포트 JSON 저장에 실패했습니다.", exception);
         }
     }
 
@@ -331,7 +331,7 @@ public class ContractService {
             return objectMapper.readValue(agentResultsJson, new TypeReference<>() {
             });
         } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("멀티에이전트 agentResults JSON 복원에 실패했습니다.", exception);
+            throw new IllegalStateException("순차형 멀티에이전트 agentResults JSON 복원에 실패했습니다.", exception);
         }
     }
 
@@ -343,7 +343,7 @@ public class ContractService {
             return objectMapper.readValue(sourcesJson, new TypeReference<>() {
             });
         } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("멀티에이전트 sources JSON 복원에 실패했습니다.", exception);
+            throw new IllegalStateException("순차형 멀티에이전트 sources JSON 복원에 실패했습니다.", exception);
         }
     }
 }
