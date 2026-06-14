@@ -3,6 +3,53 @@ import { useEffect, useState } from 'react';
 
 import { createChatSession, getChatMessages, sendChatMessage } from '../api/client.js';
 
+const SOURCE_PREVIEW_LENGTH = 300;
+
+function ChatSources({ sources }) {
+  if (!sources?.length) {
+    return null;
+  }
+
+  return (
+    <details className="chat-sources">
+      <summary>Sources ({sources.length})</summary>
+      <div className="chat-sources-list">
+        {sources.map((source, sourceIndex) => (
+          <ChatSourceItem source={source} sourceIndex={sourceIndex} key={`${source.sourceTitle}-${sourceIndex}`} />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function ChatSourceItem({ source, sourceIndex }) {
+  const [expanded, setExpanded] = useState(false);
+  const chunkText = source.chunkText || '';
+  const shouldTruncate = chunkText.length > SOURCE_PREVIEW_LENGTH;
+  const visibleText = expanded || !shouldTruncate ? chunkText : `${chunkText.slice(0, SOURCE_PREVIEW_LENGTH)}...`;
+
+  return (
+    <details className="chat-source-item">
+      <summary>
+        <span>{source.sourceTitle || `Source ${sourceIndex + 1}`}</span>
+        <small>{source.sourceType}</small>
+      </summary>
+      <div className="chat-source-detail">
+        <div className="section-title">
+          <span>{source.sourceType}</span>
+          <span>{source.similarityScore}</span>
+        </div>
+        <p>{visibleText}</p>
+        {shouldTruncate && (
+          <button className="text-button compact" type="button" onClick={() => setExpanded((current) => !current)}>
+            {expanded ? '접기' : '더보기'}
+          </button>
+        )}
+      </div>
+    </details>
+  );
+}
+
 export default function ChatPage({ navigate, contractResult, chatSession, setChatSession }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -60,6 +107,10 @@ export default function ChatPage({ navigate, contractResult, chatSession, setCha
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (sending) {
+      return;
+    }
+
     const message = input.trim();
     if (!message) {
       return;
@@ -135,23 +186,15 @@ export default function ChatPage({ navigate, contractResult, chatSession, setCha
           <article className={`${message.role}-message`} key={message.messageId || `${message.role}-${index}`}>
             <strong>{message.role}</strong>
             <p className="message-content">{message.content}</p>
-            {message.sources?.length > 0 && (
-              <div className="sources">
-                <h3>Sources</h3>
-                {message.sources.map((source, sourceIndex) => (
-                  <div className="source-item" key={`${source.sourceTitle}-${sourceIndex}`}>
-                    <div className="section-title">
-                      <span>{source.sourceType}</span>
-                      <span>{source.similarityScore}</span>
-                    </div>
-                    <strong>{source.sourceTitle}</strong>
-                    <p>{source.chunkText}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+            <ChatSources sources={message.sources} />
           </article>
         ))}
+
+        {sending && (
+          <div className="chat-loading-message" aria-label="답변 생성 중">
+            <div className="chat-spinner" />
+          </div>
+        )}
       </div>
 
       {error && <p className="error-text">{error}</p>}
@@ -162,7 +205,7 @@ export default function ChatPage({ navigate, contractResult, chatSession, setCha
           disabled={sending}
           onChange={(event) => setInput(event.target.value)}
         />
-        <button className="icon-button" type="submit" aria-label="Send message" disabled={sending}>
+        <button className="icon-button" type="submit" aria-label="Send message" disabled={sending || !input.trim()}>
           <Send size={18} />
         </button>
       </form>

@@ -342,6 +342,79 @@ blockquote {
   white-space: pre-wrap;
 }
 
+.chat-sources {
+  margin-top: 6px;
+  border: 1px solid #d7e1e2;
+  border-radius: 8px;
+  background: #f8fbfb;
+  padding: 10px 12px;
+}
+
+.chat-sources summary,
+.chat-source-item summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.chat-sources-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.chat-source-item {
+  border: 1px solid #dfe4ea;
+  border-radius: 8px;
+  background: white;
+  padding: 10px 12px;
+}
+
+.chat-source-item summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-source-item summary::after {
+  content: "▾";
+  flex: 0 0 auto;
+  color: #6a7280;
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.chat-source-item[open] summary::after {
+  transform: rotate(0deg);
+}
+
+.chat-source-item summary span {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-source-item summary small {
+  flex: 0 0 auto;
+  color: #6a7280;
+  font-weight: 600;
+}
+
+.chat-source-detail {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chat-source-detail p {
+  color: #586173;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .review-progress {
   display: grid;
   gap: 8px;
@@ -436,9 +509,21 @@ blockquote {
   padding: 14px 16px;
 }
 
-.sources-collapsible summary {
+.sources-collapsible summary,
+.report-body-collapsible summary {
   cursor: pointer;
   font-weight: 700;
+}
+
+.report-body-collapsible {
+  border: 1px solid #dfe4ea;
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 14px 16px;
+}
+
+.report-body-collapsible .markdown-report {
+  margin-top: 14px;
 }
 
 .sources-list {
@@ -484,6 +569,32 @@ blockquote {
   border: 1px solid #cbd3dc;
   border-radius: 8px;
   padding: 0 14px;
+}
+
+.chat-loading-message {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  border-radius: 8px;
+  background: #eef5f5;
+  padding: 14px 16px;
+}
+
+.chat-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #b8d1d2;
+  border-top-color: #2f6f73;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-text {
@@ -542,7 +653,8 @@ blockquote {
 
   .panel,
   .review-report,
-  .markdown-report {
+  .markdown-report,
+  .report-body-collapsible {
     border: 0;
     background: white;
     box-shadow: none;
@@ -550,5 +662,9 @@ blockquote {
 
   .markdown-report {
     padding: 0;
+  }
+
+  .report-body-collapsible:not([open]) > :not(summary) {
+    display: block !important;
   }
 }

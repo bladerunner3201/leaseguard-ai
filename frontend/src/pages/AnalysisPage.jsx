@@ -80,10 +80,7 @@ function buildReportDownloadContent({ contract, result, format }) {
     '',
   ].filter((line) => line !== null).join('\n');
 
-  if (format === 'txt') {
-    return stripMarkdown(header);
-  }
-  return header;
+  return format === 'txt' ? stripMarkdown(header) : header;
 }
 
 function MarkdownReport({ markdown }) {
@@ -298,7 +295,7 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
 
     loadSavedReport();
 
-    const storedJobId = localStorage.getItem(getReviewJobStorageKey(contractId));
+    const storedJobId = localStorage.getItem(`${REVIEW_JOB_STORAGE_PREFIX}${contractId}`);
     if (storedJobId) {
       setReviewJob({
         jobId: storedJobId,
@@ -323,6 +320,7 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
       return undefined;
     }
 
+    const storageKey = `${REVIEW_JOB_STORAGE_PREFIX}${contractId}`;
     const intervalId = window.setInterval(async () => {
       try {
         const nextJob = await getReviewJob(contractId, reviewJob.jobId);
@@ -333,18 +331,18 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
         }
 
         if (nextJob.status === 'COMPLETED') {
-          localStorage.removeItem(getReviewJobStorageKey(contractId));
+          localStorage.removeItem(storageKey);
         }
 
         if (nextJob.status === 'FAILED') {
-          localStorage.removeItem(getReviewJobStorageKey(contractId));
+          localStorage.removeItem(storageKey);
           setReviewError(nextJob.error || '새 리포트 생성에 실패했습니다. 기존 리포트를 계속 표시합니다.');
           if (nextJob.savedReviewReport) {
             setSavedReviewReport(nextJob.savedReviewReport);
           }
         }
       } catch (error) {
-        localStorage.removeItem(getReviewJobStorageKey(contractId));
+        localStorage.removeItem(storageKey);
         setReviewError(error.message || '진행 중이던 리포트 생성 상태를 확인할 수 없습니다.');
         window.clearInterval(intervalId);
       }
@@ -380,8 +378,7 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
   const isReviewRunning = startingReview || reviewJob?.status === 'PENDING' || reviewJob?.status === 'RUNNING';
 
   const handleStartReviewJob = async () => {
-    const hasExistingReport = Boolean(savedReviewReport);
-    if (hasExistingReport) {
+    if (savedReviewReport) {
       const confirmed = window.confirm('기존 리포트를 새 분석 결과로 갱신합니다. 다시 생성하시겠습니까?');
       if (!confirmed) {
         return;
@@ -392,7 +389,7 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
     setStartingReview(true);
     try {
       const startedJob = await startReviewJob(contract.contractId);
-      localStorage.setItem(getReviewJobStorageKey(contract.contractId), startedJob.jobId);
+      localStorage.setItem(`${REVIEW_JOB_STORAGE_PREFIX}${contract.contractId}`, startedJob.jobId);
       setReviewJob({
         ...startedJob,
         progress: 0,
@@ -475,9 +472,7 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
             <div className="progress-bar" aria-label="Review progress">
               <span style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
             </div>
-            <p className="muted">
-              새 리포트를 생성하는 동안 기존 저장 리포트는 유지됩니다. {progress}%
-            </p>
+            <p className="muted">새 리포트를 생성하는 동안 기존 저장 리포트는 유지됩니다. {progress}%</p>
           </div>
         )}
 
@@ -503,7 +498,10 @@ export default function AnalysisPage({ navigate, contractResult, onOpenChat }) {
                 <RiskBadge level={reviewResult.overallRiskLevel} />
               </div>
               <p>{reviewResult.summary}</p>
-              <MarkdownReport markdown={reviewResult.reportMarkdown} />
+              <details className="report-body-collapsible">
+                <summary>리포트 본문 보기</summary>
+                <MarkdownReport markdown={reviewResult.reportMarkdown} />
+              </details>
               <AgentTrace result={reviewResult} />
               {(reviewResult.sources || []).length > 0 && (
                 <details className="sources sources-collapsible no-print">
